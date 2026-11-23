@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DevisExpress — le devis d'artisan en 2 minutes, relances comprises</title>
+<meta name="description" content="Dictez votre chantier, DevisExpress rédige un devis professionnel en PDF et vous rappelle quand relancer vos clients. Pour plombiers, électriciens, peintres, carreleurs et tous les artisans.">
+<meta property="og:title" content="DevisExpress — vos devis d'artisan en 2 minutes">
+<meta property="og:description" content="Dictez votre chantier, l'IA rédige le devis. Relances clients incluses.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231d4ed8'/%3E%3Cpath d='M9 8h8l6 6v10H9z' fill='%23fff'/%3E%3Cpath d='M17 8v6h6' fill='%23f59e0b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root { --ink:#0f172a; --ink2:#334155; --muted:#64748b; --line:#e2e8f0; --brand:#1d4ed8; --brand-d:#1e3a8a; --accent:#f59e0b; --bg:#f8fafc; }
+* { box-sizing:border-box; } html { scroll-behavior:smooth; }
+body { margin:0; font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; color:var(--ink); line-height:1.55; -webkit-font-smoothing:antialiased; background:#fff; }
+a { color:inherit; }
+.wrap { max-width:1140px; margin:0 auto; padding:0 22px; }
+.btn { display:inline-flex; align-items:center; gap:8px; padding:14px 22px; border-radius:12px; font-weight:700; font-size:16px; text-decoration:none; border:2px solid transparent; transition:transform .15s, background .15s; }
+.btn:hover { transform:translateY(-1px); }
+.btn-primary { background:var(--accent); color:#111; } .btn-primary:hover { background:#fbbf24; }
+.btn-ghost { border-color:rgba(255,255,255,.35); color:#fff; } .btn-ghost:hover { background:rgba(255,255,255,.08); }
+.btn-dark { background:var(--brand); color:#fff; } .btn-dark:hover { background:var(--brand-d); }
+header.top { position:sticky; top:0; z-index:20; background:rgba(15,23,42,.92); backdrop-filter:blur(8px); }
+header.top .wrap { display:flex; align-items:center; justify-content:space-between; height:66px; }
+.logo { display:flex; align-items:center; gap:10px; color:#fff; text-decoration:none; font-weight:600; font-size:20px; }
+.logo b { color:#fbbf24; font-weight:800; } .logo svg { width:32px; height:32px; }
+.top nav { display:flex; gap:26px; align-items:center; } .top nav a { color:#cbd5e1; text-decoration:none; font-weight:500; font-size:15px; } .top nav a:hover { color:#fff; }
+.top nav .btn { padding:10px 16px; font-size:15px; color:#111; }
+.hero { background:radial-gradient(1200px 500px at 80% -10%, #1e40af 0%, transparent 60%), #0f172a; color:#fff; padding:72px 0 90px; overflow:hidden; }
+.hero .wrap { display:grid; grid-template-columns:1.05fr .95fr; gap:50px; align-items:center; }
+.pill { display:inline-block; background:rgba(245,158,11,.15); color:#fcd34d; border:1px solid rgba(245,158,11,.35); padding:6px 12px; border-radius:999px; font-size:14px; font-weight:600; margin-bottom:20px; }
+.hero h1 { font-size:clamp(36px,5vw,58px); line-height:1.05; letter-spacing:-.035em; margin:0 0 20px; }
+.hero h1 em { font-style:normal; color:#fbbf24; }
+.hero p.lead { font-size:19px; color:#cbd5e1; margin:0 0 30px; max-width:540px; }
+.hero .ctas { display:flex; gap:12px; flex-wrap:wrap; }
+.hero small { display:block; color:#94a3b8; margin-top:16px; font-size:14px; }
+.mock { position:relative; }
+.mock-paper { background:#fff; color:#1f2937; border-radius:10px; padding:26px; box-shadow:0 30px 80px rgba(0,0,0,.45); transform:rotate(1.5deg); font-size:12px; }
+.mock-paper .h { display:flex; justify-content:space-between; margin-bottom:14px; } .mock-paper .h b { font-size:13px; } .mock-paper .h span { color:#1d4ed8; font-weight:800; font-size:22px; }
+.mock-paper .obj { font-weight:700; margin:8px 0 10px; font-size:13px; }
+.mock-paper table { width:100%; border-collapse:collapse; } .mock-paper th { background:#1d4ed8; color:#fff; font-size:10.5px; padding:5px 7px; text-align:right; } .mock-paper th:first-child, .mock-paper td:first-child { text-align:left; }
+.mock-paper td { padding:6px 7px; border-bottom:1px solid #e5e7eb; text-align:right; font-size:11px; }
+.mock-paper .tot { margin:10px 0 0 auto; width:55%; } .mock-paper .tot div { display:flex; justify-content:space-between; padding:2px 0; }
+.mock-paper .ttc { background:#1d4ed8; color:#fff; font-weight:700; padding:6px 8px !important; border-radius:4px; margin-top:4px; }
+.bubble { position:absolute; z-index:2; background:#fff; color:var(--ink); border-radius:14px; padding:12px 14px; box-shadow:0 14px 40px rgba(0,0,0,.35); font-size:13.5px; font-weight:500; display:flex; gap:10px; align-items:center; max-width:270px; }
+.bubble i { font-style:normal; font-size:20px; }
+.b1 { top:-26px; left:-30px; transform:rotate(-2deg); } .b2 { bottom:-30px; right:-14px; }
+section { padding:84px 0; }
+.kicker { color:var(--brand); font-weight:700; font-size:14px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; }
+h2 { font-size:clamp(28px,3.6vw,40px); line-height:1.15; letter-spacing:-.03em; margin:0 0 16px; }
+.sub { color:var(--muted); font-size:18px; max-width:640px; margin:0 0 44px; }
+.center { text-align:center; } .center .sub { margin-left:auto; margin-right:auto; }
+.pains { background:var(--bg); }
+.grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+.box { background:#fff; border:1px solid var(--line); border-radius:16px; padding:26px; }
+.box .em { font-size:30px; margin-bottom:10px; } .box h3 { margin:0 0 8px; font-size:19px; } .box p { margin:0; color:var(--ink2); }
+.steps { counter-reset:s; }
+.step { position:relative; padding-top:58px; } .step::before { counter-increment:s; content:counter(s); position:absolute; top:0; left:0; width:42px; height:42px; border-radius:12px; background:var(--brand); color:#fff; font-weight:800; display:grid; place-items:center; font-size:19px; }
+.step h3 { margin:0 0 8px; font-size:20px; } .step p { margin:0; color:var(--ink2); }
+.feats { background:#0f172a; color:#fff; } .feats .sub { color:#94a3b8; } .feats .kicker { color:#fbbf24; }
+.grid2 { display:grid; grid-template-columns:repeat(2,1fr); gap:18px; }
+.feat { display:flex; gap:16px; padding:22px; border-radius:16px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); }
+.feat .ico { flex:none; width:44px; height:44px; border-radius:12px; background:rgba(245,158,11,.15); display:grid; place-items:center; font-size:22px; }
+.feat h3 { margin:0 0 4px; font-size:17px; } .feat p { margin:0; color:#cbd5e1; font-size:15px; }
+.prices { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; align-items:stretch; }
+.price { border:1px solid var(--line); border-radius:18px; padding:30px; display:flex; flex-direction:column; background:#fff; }
+.price.best { border:2px solid var(--brand); box-shadow:0 20px 50px rgba(29,78,216,.15); position:relative; }
+.price.best::before { content:'Le plus choisi'; position:absolute; top:-13px; left:50%; transform:translateX(-50%); background:var(--brand); color:#fff; font-size:13px; font-weight:700; padding:4px 12px; border-radius:999px; }
+.price h3 { margin:0 0 6px; font-size:20px; } .price .desc { color:var(--muted); margin:0 0 18px; font-size:15px; }
+.price .amount { font-size:44px; font-weight:800; letter-spacing:-.03em; } .price .amount small { font-size:16px; color:var(--muted); font-weight:500; }
+.price ul { list-style:none; padding:0; margin:20px 0 26px; display:flex; flex-direction:column; gap:10px; flex:1; }
+.price li { padding-left:26px; position:relative; color:var(--ink2); } .price li::before { content:'✓'; position:absolute; left:0; color:#059669; font-weight:800; }
+.price .btn { justify-content:center; }
+.price .btn-outline { border-color:var(--line); color:var(--ink); } .price .btn-outline:hover { border-color:var(--ink); }
+.faq { background:var(--bg); } .faq .wrap { max-width:820px; }
+details { background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px 22px; margin-bottom:12px; }
+summary { font-weight:700; cursor:pointer; font-size:17px; list-style:none; display:flex; justify-content:space-between; gap:14px; }
+summary::after { content:'+'; color:var(--brand); font-size:22px; line-height:1; } details[open] summary::after { content:'–'; }
+details p { margin:12px 0 0; color:var(--ink2); }
+.final { background:linear-gradient(135deg,#1d4ed8,#1e3a8a); color:#fff; text-align:center; }
+.final p { color:#dbeafe; font-size:19px; margin:0 0 30px; }
+footer { background:#0f172a; color:#94a3b8; padding:36px 0; font-size:14px; }
+footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; } footer a { color:#cbd5e1; text-decoration:none; margin-left:18px; }
+@media (max-width:900px) {
+  .hero .wrap, .grid3, .grid2, .prices { grid-template-columns:1fr; }
+  .mock { margin-top:30px; } .b1 { left:0; } .b2 { right:0; }
+  .top nav a:not(.btn) { display:none; }
+  section { padding:64px 0; }
+  footer a { margin:0 14px 0 0; }
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="logo" href="#"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#1d4ed8"/><path d="M9 8h8l6 6v10H9z" fill="#fff"/><path d="M17 8v6h6" fill="#f59e0b"/></svg>Devis<b>Express</b></a>
+  <nav><a href="#comment">Comment ça marche</a><a href="#tarifs">Tarifs</a><a href="#faq">Questions</a><a class="btn btn-primary" href="app/">Essayer gratuitement</a></nav>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <div>
+    <span class="pill">Pour les artisans qui préfèrent le chantier à la paperasse</span>
+    <h1>Votre devis pro en <em>2 minutes</em>. Les relances, c'est nous.</h1>
+    <p class="lead">Dictez votre chantier depuis le camion. DevisExpress rédige un devis clair et soigné en PDF, avec vos prix, puis vous dit quand et comment relancer le client.</p>
+    <div class="ctas"><a class="btn btn-primary" href="app/">Créer mon premier devis →</a><a class="btn btn-ghost" href="#comment">Voir comment ça marche</a></div>
+    <small>Gratuit pour commencer · Sans carte bancaire · Sans installation</small>
+  </div>
+  <div class="mock" aria-hidden="true">
+    <div class="bubble b1"><i>🎙️</i>« Remplacement chauffe-eau 200 L, dépose de l'ancien, 3 h de main-d'œuvre »</div>
+    <div class="mock-paper">
+      <div class="h"><div><b>Dupont Plomberie</b><br><span style="color:#64748b;font-size:10px;font-weight:400">14 rue Paul Bert, 69003 Lyon</span></div><span>DEVIS</span></div>
+      <div class="obj">Objet : Remplacement du chauffe-eau</div>
+      <table><thead><tr><th>Désignation</th><th>Qté</th><th>Total HT</th></tr></thead>
+      <tbody><tr><td>Chauffe-eau électrique 200 L</td><td>1 u</td><td>520,00 €</td></tr><tr><td>Dépose et évacuation de l'ancien</td><td>1 forfait</td><td>90,00 €</td></tr><tr><td>Groupe de sécurité</td><td>1 u</td><td>45,00 €</td></tr><tr><td>Main-d'œuvre plombier</td><td>3 h</td><td>165,00 €</td></tr></tbody></table>
+      <div class="tot"><div><span>Total HT</span><span>820,00 €</span></div><div><span>TVA 10 %</span><span>82,00 €</span></div><div class="ttc"><span>Total TTC</span><span>902,00 €</span></div></div>
+    </div>
+    <div class="bubble b2"><i>🔔</i>Relance prévue pour M. Martin aujourd'hui — message prêt</div>
+  </div>
+</div></section>
+
+<section class="pains"><div class="wrap">
+  <div class="kicker">Vous vous reconnaissez ?</div>
+  <h2>Le devis, c'est le soir, c'est long, et souvent ça reste sans réponse.</h2>
+  <p class="sub">Les chantiers se gagnent souvent à la rapidité et au suivi. Pas à celui qui a passé deux heures sur Word.</p>
+  <div class="grid3">
+    <div class="box"><div class="em">🌙</div><h3>Des soirées sur l'ordi</h3><p>Recopier les lignes, recalculer la TVA, chercher le bon modèle… après une journée de chantier.</p></div>
+    <div class="box"><div class="em">🤷</div><h3>Des clients qui ne répondent pas</h3><p>On n'ose pas relancer, ou on oublie. Le client signe chez celui qui l'a rappelé.</p></div>
+    <div class="box"><div class="em">📄</div><h3>Un devis qui fait amateur</h3><p>Mise en page bancale, mentions manquantes : le client hésite, même quand le prix est bon.</p></div>
+  </div>
+</div></section>
+
+<section id="comment"><div class="wrap">
+  <div class="kicker">Comment ça marche</div>
+  <h2>Trois étapes, deux minutes.</h2>
+  <p class="sub">Vous remplissez votre profil une seule fois : nom, SIRET, assurance, logo. Ensuite, chaque devis se fait en un clin d'œil.</p>
+  <div class="grid3 steps">
+    <div class="step"><h3>Décrivez ou dictez le chantier</h3><p>Comme vous l'expliqueriez à un collègue. Depuis votre téléphone, sur place, ou au bureau.</p></div>
+    <div class="step"><h3>L'IA rédige le devis</h3><p>Lignes, quantités, vos prix habituels, texte de présentation. Vous vérifiez, vous ajustez, c'est vous qui décidez.</p></div>
+    <div class="step"><h3>Envoyez, on suit pour vous</h3><p>PDF prêt à envoyer. DevisExpress vous rappelle quand relancer et vous donne le message, par email ou SMS.</p></div>
+  </div>
+</div></section>
+
+<section class="feats"><div class="wrap">
+  <div class="kicker">Tout ce qu'il faut, rien de plus</div>
+  <h2>Pensé pour les artisans, pas pour les comptables.</h2>
+  <p class="sub">Simple sur téléphone, clair pour vos clients.</p>
+  <div class="grid2">
+    <div class="feat"><div class="ico">🎙️</div><div><h3>Saisie à la voix</h3><p>Dictez le chantier : l'IA le transforme en lignes de devis propres.</p></div></div>
+    <div class="feat"><div class="ico">📚</div><div><h3>Vos prix, mémorisés</h3><p>Votre bibliothèque de prestations est utilisée en priorité. Les prix estimés sont signalés pour vérification.</p></div></div>
+    <div class="feat"><div class="ico">✍️</div><div><h3>Texte qui donne envie de signer</h3><p>Un paragraphe d'introduction rédigé pour rassurer le client et reformuler son besoin.</p></div></div>
+    <div class="feat"><div class="ico">📄</div><div><h3>PDF professionnel</h3><p>Votre logo, vos couleurs, TVA par taux, acompte, assurance, zone « Bon pour accord ».</p></div></div>
+    <div class="feat"><div class="ico">🔔</div><div><h3>Relances au bon moment</h3><p>À J+3, J+7 et J+14 : le message est prêt, vous n'avez plus qu'à l'envoyer.</p></div></div>
+    <div class="feat"><div class="ico">📊</div><div><h3>Vos chiffres en un coup d'œil</h3><p>Devis en attente, signés, taux de signature : vous savez où vous en êtes.</p></div></div>
+  </div>
+</div></section>
+
+<section id="tarifs"><div class="wrap center">
+  <div class="kicker">Tarifs</div>
+  <h2>Un chantier signé de plus, et c'est remboursé.</h2>
+  <p class="sub">Sans engagement. Commencez gratuitement, passez en Pro quand vous êtes convaincu.</p>
+  <div class="prices" style="text-align:left">
+    <div class="price"><h3>Découverte</h3><p class="desc">Pour essayer tranquillement.</p><div class="amount">0 €<small> /mois</small></div>
+      <ul><li>3 devis par mois</li><li>Assistant IA inclus</li><li>PDF avec mention DevisExpress</li></ul><a class="btn btn-outline" href="app/">Commencer</a></div>
+    <div class="price best"><h3>Pro</h3><p class="desc">Pour l'artisan indépendant.</p><div class="amount">19 €<small> HT/mois</small></div>
+      <ul><li>Devis illimités</li><li>Saisie à la voix et IA illimitées</li><li>Relances email et SMS</li><li>Votre logo, sans mention DevisExpress</li><li>Bibliothèque de prix</li></ul><a class="btn btn-dark" href="app/">Essayer 14 jours gratuits</a></div>
+    <div class="price"><h3>Équipe</h3><p class="desc">Pour les entreprises avec plusieurs devisants.</p><div class="amount">39 €<small> HT/mois</small></div>
+      <ul><li>Tout le plan Pro</li><li>Jusqu'à 5 utilisateurs</li><li>Statistiques par personne</li><li>Support prioritaire</li></ul><a class="btn btn-outline" href="app/">Nous contacter</a></div>
+  </div>
+</div></section>
+
+<section class="faq" id="faq"><div class="wrap">
+  <div class="kicker center">Questions fréquentes</div>
+  <h2 class="center">Vous vous demandez sûrement…</h2>
+  <details><summary>Est-ce que l'IA fixe mes prix à ma place ?</summary><p>Non. Elle utilise d'abord vos prix enregistrés. Quand elle propose un prix pour une prestation inconnue, la ligne est surlignée pour que vous la vérifiiez. Vous gardez toujours le dernier mot.</p></details>
+  <details><summary>Les mentions obligatoires sont-elles sur le devis ?</summary><p>Le devis intègre les mentions courantes : identité et SIRET, date et durée de validité, détail des prestations, HT/TVA/TTC, conditions de paiement, assurance professionnelle, médiateur et zone de signature. Les obligations varient selon votre statut et votre métier : faites valider votre modèle une fois par votre comptable.</p></details>
+  <details><summary>Je suis en micro-entreprise, sans TVA. Ça marche ?</summary><p>Oui : choisissez « Franchise en base » dans votre profil. La TVA disparaît et la mention « TVA non applicable, art. 293 B du CGI » est ajoutée automatiquement.</p></details>
+  <details><summary>Faut-il installer quelque chose ?</summary><p>Non, tout se passe dans le navigateur, sur téléphone comme sur ordinateur.</p></details>
+  <details><summary>Où sont stockées mes données ?</summary><p>Vos devis restent sur votre appareil. Vous pouvez exporter une sauvegarde à tout moment depuis votre profil.</p></details>
+</div></section>
+
+<section class="final"><div class="wrap">
+  <h2>Votre prochain devis peut partir dans 2 minutes.</h2>
+  <p>Essayez maintenant, c'est gratuit.</p>
+  <a class="btn btn-primary" href="app/">Créer mon premier devis →</a>
+</div></section>
+
+<footer><div class="wrap">
+  <span>© DevisExpress</span>
+  <span><a href="mentions-legales.html">Mentions légales</a><a href="cgu.html">CGU</a><a href="confidentialite.html">Confidentialité</a><a href="mailto:contact@votre-domaine.fr">Contact</a></span>
+</div></footer>
+</body>
+</html>
