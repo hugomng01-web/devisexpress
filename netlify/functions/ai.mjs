@@ -93,6 +93,7 @@ async function geminiFlashModels() {
 async function geminiOnce(model, prompt) {
   const res = await fetch(`${GEMINI}/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
+    signal: AbortSignal.timeout(12000), // un modèle trop lent est abandonné au profit du suivant
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
     body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 8000 } }),
   });
@@ -105,9 +106,10 @@ async function geminiOnce(model, prompt) {
 async function callGemini(prompt) {
   const preferred = [process.env.AI_MODEL, geminiLastGood, 'gemini-flash-latest', 'gemini-flash-lite-latest'].filter(Boolean);
   const tried = new Set();
+  const start = Date.now();
   let lastErr;
   const attempt = async (model) => {
-    if (tried.has(model)) return null;
+    if (tried.has(model) || Date.now() - start > 15000) return null; // on reste sous la limite de 26 s de Netlify
     tried.add(model);
     try { const t = await geminiOnce(model, prompt); geminiLastGood = model; return t; }
     catch (e) { lastErr = e; console.error('[ai]', e.message); if (e.status === 400 || e.status === 401 || e.status === 403) throw e; return null; }
