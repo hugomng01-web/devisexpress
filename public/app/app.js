@@ -2,6 +2,7 @@
 // Données enregistrées dans le navigateur de l'artisan (localStorage).
 import { buildPrompt, parseJSON } from './prompts.js';
 import { generatePDF } from './pdf.js';
+import { MODELES, texteIntro } from './modeles.js';
 
 /* =========================================================
    Constantes
@@ -73,7 +74,7 @@ function defaultProfil() {
     couleur: '#1e40af', logo: '', templates: JSON.parse(JSON.stringify(DEFAULT_TEMPLATES)),
   };
 }
-const defaultState = () => ({ version: 1, profil: defaultProfil(), prestations: [], devis: [] });
+const defaultState = () => ({ version: 1, profil: defaultProfil(), prestations: [], devis: [], modeles: [] });
 
 /* =========================================================
    Utilitaires
@@ -123,6 +124,7 @@ function migrate(s) {
   if (!Array.isArray(s.profil.templates) || s.profil.templates.length !== 3) s.profil.templates = base.profil.templates;
   s.prestations = Array.isArray(s.prestations) ? s.prestations : [];
   s.devis = Array.isArray(s.devis) ? s.devis : [];
+  s.modeles = Array.isArray(s.modeles) ? s.modeles : [];
   for (const d of s.devis) {
     d.client ??= {}; d.chantier ??= {}; d.lignes ??= []; d.relances ??= [];
   }
@@ -174,6 +176,18 @@ async function askAI(task, data) {
   try { body = await res.json(); } catch (e) { /* réponse non JSON */ }
   if (!res.ok) throw new AIError(body.error || "L'assistant IA n'est pas configuré sur ce site (voir le guide de mise en ligne).", 'server');
   return body.text || '';
+}
+
+// L'IA est-elle disponible ? (clé configurée sur le serveur, ou démo dans claude.ai)
+let aiOn = false;
+function setAI(on) { aiOn = !!on; document.body.classList.toggle('ai-on', aiOn); }
+async function detectAI() {
+  if (inClaude()) { setAI(!!(await cap('sample'))); return; }
+  try {
+    const r = await fetch('/api/ai', { method: 'GET', headers: { Accept: 'application/json' } });
+    const b = await r.json();
+    setAI(r.ok && b.enabled);
+  } catch (e) { setAI(false); }
 }
 
 async function saveFile(filename, bytes, mime) {
@@ -327,6 +341,29 @@ function createDevis() {
 const getDevis = id => state.devis.find(d => d.id === id);
 const touch = dv => { dv.updatedAt = Date.now(); save(); };
 
+const normTxt = s => String(s || '').toLowerCase().replace(/œ/g, 'oe').replace(/[-'’()]/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+function findLib(designation) {
+  const n = normTxt(designation); if (!n) return null;
+  const STOPW = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'l', 'd', 'et', 'en', 'a', 'au', 'aux', 'un', 'une', 'pour', 'avec']);
+  const words = t => new Set(t.split(' ').filter(w => w.length > 1 && !STOPW.has(w)));
+  const A = words(n);
+  let best = null, bestScore = 0;
+  for (const p of state.prestations) {
+    const q = normTxt(p.designation);
+    if (q === n) return p;
+    const B = words(q);
+    let inter = 0; for (const w of A) if (B.has(w)) inter++;
+    const score = inter / Math.max(1, Math.min(A.size, B.size));
+    if (inter >= 2 && score >= 0.75 && score > bestScore) { best = p; bestScore = score; }
+  }
+  return best;
+}
+function ligneDepuisModele(designation, details, qte, unite, pu, tva) {
+  const hit = findLib(designation);
+  if (hit) return newLigne({ designation, details: details || '', qte, unite: hit.unite || unite, pu: parseNum(hit.prixHT), tva: parseNum(hit.tva ?? state.profil.tvaDefaut) });
+  return newLigne({ designation, details: details || '', qte, unite, pu: parseNum(pu), ...(tva !== undefined ? { tva: parseNum(tva) } : {}) });
+}
+
 /* Découpage simple sans IA (secours si l'IA n'est pas disponible) */
 function localParse(description) {
   const lib = state.prestations;
@@ -340,7 +377,7 @@ function localParse(description) {
       const u = m[2].toLowerCase();
       unite = u.startsWith('h') ? 'h' : u.startsWith('j') ? 'j' : /m2|m²/.test(u) ? 'm²' : /ml|lin/.test(u) ? 'ml' : /m3|m³/.test(u) ? 'm³' : u === 'kg' ? 'kg' : 'forfait';
     } else {
-      const m2 = txt.match(/^(\d+)\s+(.+)/);
+      const m2 = txt.match(/^(\d+)\s+(.+)/) || txt.match(/\b(\d+(?:[.,]\d+)?)\s+[a-zà-ÿœ'-]{2,}[sx]\b/i);
       if (m2) qte = parseNum(m2[1]);
     }
     const norm = s => String(s).toLowerCase().replace(/œ/g, 'oe').replace(/[-']/g, ' ').normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -350,7 +387,7 @@ function localParse(description) {
     const designation = txt.charAt(0).toUpperCase() + txt.slice(1);
     return hit
       ? newLigne({ designation: hit.designation, details: '', qte, unite: hit.unite || unite, pu: parseNum(hit.prixHT), tva: hit.tva ?? state.profil.tvaDefaut })
-      : newLigne({ designation: designation.slice(0, 120), qte, unite, pu: 0, estime: true });
+      : newLigne({ designation: designation.slice(0, 120), qte, unite, pu: 0, estime: false });
   });
 }
 
@@ -500,11 +537,13 @@ const field = (label, bind, val, o = {}) => `
 function lineRow(l) {
   const tot = parseNum(l.qte) * parseNum(l.pu);
   const franchise = state.profil.tvaRegime === 'franchise';
-  return `<div class="line ${l.estime ? 'estime' : ''}" data-line="${l.id}">
+  const sansPrix = !l.estime && !parseNum(l.pu) && String(l.designation || '').trim();
+  return `<div class="line ${l.estime || sansPrix ? 'estime' : ''}" data-line="${l.id}">
     <div class="l-des">
       <input class="l-designation" data-lf="designation" value="${esc(l.designation)}" placeholder="Désignation (ex. Pose carrelage sol)">
       <textarea data-lf="details" rows="1" placeholder="Précisions (optionnel)">${esc(l.details)}</textarea>
       ${l.estime ? `<div class="estime-note">${icon('info')} Prix proposé par l'IA : vérifiez-le avant d'envoyer.</div>` : ''}
+      ${sansPrix ? `<div class="estime-note">${icon('info')} Prix à compléter. Astuce : l'icône ${icon('save')} l'enregistre pour les prochains devis.</div>` : ''}
     </div>
     <label class="l-num"><span>Qté</span><input data-lf="qte" inputmode="decimal" value="${esc(String(l.qte).replace('.', ','))}"></label>
     <label class="l-u"><span>Unité</span><select data-lf="unite">${[...new Set([...UNITES, l.unite || 'u'])].map(u => `<option ${u === l.unite ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select></label>
@@ -519,6 +558,8 @@ function lineRow(l) {
   </div>`;
 }
 
+const noLinesHTML = () => `<div class="empty" id="no-lines"><p>Aucune ligne pour l'instant. Décrivez le chantier ci-dessus, partez d'un modèle, ou ajoutez une ligne.</p><button class="btn" data-action="open-modeles">${icon('doc')} Choisir un modèle de devis</button></div>`;
+
 function viewEditeur() {
   const dv = getDevis(currentId);
   const p = state.profil;
@@ -531,6 +572,7 @@ function viewEditeur() {
     </div>
     <div class="head-actions">
       <button class="btn" data-action="duplicate">${icon('copy')} Dupliquer</button>
+      <button class="btn" data-action="save-modele">${icon('save')} Enregistrer comme modèle</button>
       <button class="btn primary" data-action="pdf">${icon('download')} Télécharger le PDF</button>
     </div>
   </div>
@@ -569,14 +611,15 @@ function viewEditeur() {
       </section>
 
       <section class="card ai-card">
-        <h2>${icon('spark')} Décrivez le chantier, l'IA rédige les lignes</h2>
-        <p class="muted small">Écrivez comme vous parlez. Exemple : « Remplacement chauffe-eau 200 L, dépose de l'ancien, raccordement, 3 h de main-d'œuvre, déplacement ».</p>
+        <h2>${icon('spark')} <span data-ai>Décrivez le chantier, l'IA rédige les lignes</span><span data-noai>Décrivez le chantier, l'outil prépare les lignes</span></h2>
+        <p class="muted small">Écrivez comme vous parlez, une prestation par ligne ou séparées par des virgules. Exemple : « Remplacement chauffe-eau 200 L, dépose de l'ancien, 3 h de main-d'œuvre, déplacement ». <span data-noai>Ou partez d'un modèle de votre métier.</span></p>
         <div class="ai-input">
           <textarea id="ai-desc" data-bind="description" rows="4" placeholder="Décrivez les travaux à réaliser…">${esc(dv.description)}</textarea>
           ${dictationAvailable() ? `<button class="btn mic" data-action="dictate">${icon('mic')}<span>Dicter</span></button>` : ''}
         </div>
         <div class="row-gap">
           <button class="btn primary" data-action="ai-lines">${icon('spark')} Générer les lignes du devis</button>
+          <button class="btn" data-action="open-modeles">${icon('doc')} Partir d'un modèle</button>
           <span class="muted small">Vos prix enregistrés dans la bibliothèque sont utilisés en priorité.</span>
         </div>
       </section>
@@ -587,7 +630,7 @@ function viewEditeur() {
             ${state.prestations.length ? `<select class="lib-select" data-action-change="add-from-lib"><option value="">+ Depuis ma bibliothèque…</option>${state.prestations.map(pr => `<option value="${pr.id}">${esc(pr.designation)} — ${fmtMoney(pr.prixHT)}/${esc(pr.unite)}</option>`).join('')}</select>` : ''}
           </div>
         </div>
-        <div id="lines">${dv.lignes.map(lineRow).join('') || `<p class="empty" id="no-lines">Aucune ligne. Décrivez le chantier ci-dessus ou ajoutez une ligne.</p>`}</div>
+        <div id="lines">${dv.lignes.map(lineRow).join('') || noLinesHTML()}</div>
         <button class="btn add-line" data-action="add-line">${icon('plus')} Ajouter une ligne</button>
         <div class="totals-row">
           <div class="fgrid small-grid">
@@ -602,7 +645,7 @@ function viewEditeur() {
         <h2>${icon('pen')} Texte de présentation</h2>
         <p class="muted small">Quelques phrases en haut du devis qui reformulent le besoin et rassurent le client : c'est souvent ce qui fait signer.</p>
         <textarea data-bind="intro" rows="5" placeholder="Madame, Monsieur, suite à notre visite…">${esc(dv.intro)}</textarea>
-        <div class="row-gap"><button class="btn" data-action="ai-intro">${icon('spark')} Rédiger avec l'IA</button></div>
+        <div class="row-gap"><button class="btn" data-action="ai-intro">${icon('spark')} <span data-ai>Rédiger avec l'IA</span><span data-noai>${dv.intro ? 'Proposer une autre formulation' : 'Rédiger automatiquement'}</span></button></div>
       </section>
 
       <section class="card">
@@ -671,7 +714,7 @@ function refreshDerived() {
 }
 function renderLines() {
   const dv = getDevis(currentId);
-  $('#lines').innerHTML = dv.lignes.map(lineRow).join('') || `<p class="empty" id="no-lines">Aucune ligne. Décrivez le chantier ci-dessus ou ajoutez une ligne.</p>`;
+  $('#lines').innerHTML = dv.lignes.map(lineRow).join('') || noLinesHTML();
   autosizeAll();
   refreshDerived();
 }
@@ -707,7 +750,7 @@ function viewRelances() {
         <button class="btn primary" data-action="relance-copy" data-id="${d.id}">${icon('copy')} Copier</button>
         ${d.client.email ? `<a class="btn" data-relance-mail="${d.id}" href="${mailtoLink(d, t.email)}">${icon('send')} Ouvrir dans ma messagerie</a>` : ''}
         ${d.client.tel ? `<a class="btn" data-relance-sms="${d.id}" href="${smsLink(d, t.sms)}">${icon('phone')} SMS</a>` : ''}
-        <button class="btn" data-action="relance-ai" data-id="${d.id}" data-niveau="${niveau}">${icon('spark')} Personnaliser avec l'IA</button>
+        <button class="btn" data-ai data-action="relance-ai" data-id="${d.id}" data-niveau="${niveau}">${icon('spark')} Personnaliser avec l'IA</button>
         <button class="btn success" data-action="relance-done" data-id="${d.id}">${icon('check')} Marquer la relance comme faite</button>
       </div>
       <p class="muted small">${d.client.email ? `Email : ${esc(d.client.email)}` : 'Pas d\'email client.'} ${d.client.tel ? ' · Tél. : ' + esc(d.client.tel) : ''}</p>` : ''}
@@ -829,6 +872,12 @@ function viewProfil() {
   </section>
 
   <section class="card">
+    <h2>${icon('doc')} Mes modèles de devis</h2>
+    ${state.modeles.length ? `<ul class="list">${state.modeles.map(m => `<li class="modele-row"><div><strong>${esc(m.nom)}</strong><span class="muted small"> · ${m.lignes.length} lignes</span></div><button class="icon-btn danger" data-action="del-modele" data-id="${m.id}" title="Supprimer ce modèle">${icon('trash')}</button></li>`).join('')}</ul>`
+      : `<p class="muted small">Aucun modèle personnel. Dans un devis, cliquez sur « Enregistrer comme modèle » pour réutiliser ses lignes et ses prix.</p>`}
+  </section>
+
+  <section class="card">
     <h2>${icon('save')} Sauvegarde</h2>
     <p class="muted small">Vos données sont enregistrées sur cet appareil, dans ce navigateur. Exportez une sauvegarde régulièrement, ou pour passer sur un autre appareil.</p>
     <div class="row-gap wrap">
@@ -913,12 +962,14 @@ const actions = {
   },
 
   'dictate': el => toggleDictation(el, $('#ai-desc')),
-  'ai-lines': el => withBusy(el, 'L\'IA rédige…', async () => {
+  'ai-lines': el => withBusy(el, aiOn ? 'L\'IA rédige…' : 'Préparation…', async () => {
     const dv = getDevis(currentId);
     if (!dv.description.trim()) { toast('Décrivez d\'abord le chantier (ou dictez-le).', 'warn'); $('#ai-desc').focus(); return; }
     if (dict.active) toggleDictation(dict.btn, dict.target);
-    let lignes = [], objet = '', viaAI = true;
-    try {
+    let lignes = [], objet = '', viaAI = aiOn;
+    if (!aiOn) {
+      lignes = localParse(dv.description);
+    } else try {
       const txt = await askAI('lignes', { description: dv.description, metier: state.profil.metier, bibliotheque: state.prestations });
       const data = parseJSON(txt);
       if (!data || !Array.isArray(data.lignes)) throw new AIError('Réponse de l\'IA illisible.', 'parse');
@@ -930,7 +981,7 @@ const actions = {
       }));
       // les prix de la bibliothèque priment toujours
       for (const l of lignes) {
-        const hit = state.prestations.find(p => p.designation.trim().toLowerCase() === l.designation.trim().toLowerCase());
+        const hit = findLib(l.designation);
         if (hit) Object.assign(l, { pu: parseNum(hit.prixHT), unite: hit.unite, tva: parseNum(hit.tva), estime: false });
       }
     } catch (e) {
@@ -949,9 +1000,23 @@ const actions = {
     if (objet && !dv.chantier.objet) { dv.chantier.objet = objet; const inp = $('[data-bind="chantier.objet"]'); if (inp) inp.value = objet; }
     touch(dv); renderLines();
     if (viaAI) toast(lignes.some(l => l.estime) ? 'Lignes créées. Les prix surlignés sont des estimations : vérifiez-les.' : 'Lignes créées avec vos prix.', 'ok', 5000);
+    else if (!aiOn) toast(lignes.some(l => !parseNum(l.pu)) ? `${lignes.length} ligne(s) préparée(s) : complétez les prix surlignés.` : `${lignes.length} ligne(s) préparée(s) avec vos prix.`, 'ok', 5000);
     $('#lines').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }),
-  'ai-intro': el => withBusy(el, 'Rédaction…', async () => {
+  'ai-intro': el => aiOn ? actions['ai-intro-ia'](el) : actions['ai-intro-auto'](el),
+  'ai-intro-auto': el => {
+    const dv = getDevis(currentId);
+    if (!dv.lignes.length && !dv.chantier.objet && !dv.description) { toast('Indiquez au moins l\'objet ou les prestations du chantier.', 'warn'); return; }
+    {
+      dv.introVariante = dv.intro ? ((dv.introVariante || 0) + 1) % 3 : 0;
+      dv.intro = texteIntro({ client: dv.client.nom, objet: dv.chantier.objet || dv.description.slice(0, 120), lignes: dv.lignes, dateDebut: dv.chantier.dateDebut ? fmtDate(dv.chantier.dateDebut) : '', duree: dv.chantier.duree }, dv.introVariante);
+      touch(dv);
+      const ta = $('[data-bind="intro"]'); if (ta) ta.value = dv.intro;
+      const lab = el.querySelector('[data-noai]'); if (lab) lab.textContent = 'Proposer une autre formulation';
+      refreshDerived(); toast('Texte rédigé. Personnalisez-le si besoin.');
+    }
+  },
+  'ai-intro-ia': el => withBusy(el, 'Rédaction…', async () => {
     const dv = getDevis(currentId);
     if (!dv.lignes.length && !dv.chantier.objet && !dv.description) { toast('Indiquez au moins l\'objet ou les prestations du chantier.', 'warn'); return; }
     try {
@@ -973,6 +1038,8 @@ const actions = {
     if (!dv.client.nom) missing.push('le nom du client');
     if (missing.length && !(await confirmBox(`Il manque ${missing.join(', ')}. Télécharger quand même ?`, 'Télécharger'))) return;
     if (dv.lignes.some(l => l.estime) && !(await confirmBox('Certains prix sont des estimations de l\'IA (surlignés). Les avez-vous vérifiés ?', 'Oui, télécharger'))) return;
+    const sansPrix = dv.lignes.filter(l => String(l.designation || '').trim() && !parseNum(l.pu)).length;
+    if (sansPrix && !(await confirmBox(`${sansPrix} ligne(s) n'ont pas de prix (surlignées). Télécharger quand même ?`, 'Télécharger'))) return;
     try {
       const bytes = await generatePDF(dv, state.profil, computeTotals(dv), fmt);
       const name = `Devis ${dv.numero}${dv.client.nom ? ' - ' + dv.client.nom : ''}.pdf`.replace(/[\\/:*?"<>|]/g, '');
@@ -1031,6 +1098,56 @@ const actions = {
     toast(r?.niveau ? `Relance notée. Prochaine relance le ${fmtDate(r.due)}.` : 'Relance notée. C\'était la dernière prévue.');
   },
 
+  'open-modeles': async () => {
+    const perso = state.modeles;
+    const metierUser = normTxt(state.profil.metier);
+    const groupes = MODELES.slice().sort((a, b) => (metierUser && metierUser.includes(normTxt(b.metier).slice(0, 5)) ? 1 : 0) - (metierUser && metierUser.includes(normTxt(a.metier).slice(0, 5)) ? 1 : 0));
+    const btn = (key, nom, sub) => `<button class="tpl-pick" data-close="${key}"><strong>${esc(nom)}</strong><span>${esc(sub)}</span></button>`;
+    const html = `<h3>Partir d'un modèle</h3>
+      <p class="modal-msg small">Les lignes sont ajoutées au devis. Les prix viennent de votre bibliothèque quand une prestation porte le même nom ; sinon, complétez-les.</p>
+      <div class="tpl-list">
+        ${perso.length ? `<div class="tpl-group"><h4>Mes modèles</h4>${perso.map(m => btn('p:' + m.id, m.nom, `${m.lignes.length} lignes · avec vos prix`)).join('')}</div>` : ''}
+        ${groupes.map((g) => `<div class="tpl-group"><h4>${esc(g.metier)}</h4>${g.items.map(it => btn('m:' + MODELES.indexOf(g) + ':' + g.items.indexOf(it), it.nom, `${it.lignes.length} lignes`)).join('')}</div>`).join('')}
+      </div>
+      <div class="modal-actions"><button class="btn" data-close="">Fermer</button></div>`;
+    const choice = await modal(html, { wide: true });
+    if (!choice) return;
+    let m;
+    if (choice.startsWith('p:')) {
+      const pm = perso.find(x => x.id === choice.slice(2)); if (!pm) return;
+      m = { objet: pm.objet, duree: pm.duree, lignes: pm.lignes.map(l => ligneDepuisModele(l.designation, l.details, l.qte, l.unite, l.pu, l.tva)) };
+    } else {
+      const [, gi, ii] = choice.split(':'); const it = MODELES[+gi].items[+ii];
+      m = { objet: it.objet, duree: it.duree, lignes: it.lignes.map(([d, det, q, u]) => ligneDepuisModele(d, det, q, u, 0)) };
+    }
+    const dv = getDevis(currentId);
+    if (dv.lignes.some(l => l.designation.trim())) {
+      const c = await modal(`<h3>Ajouter ${m.lignes.length} ligne(s)</h3><p class="modal-msg">Votre devis contient déjà des lignes. Que voulez-vous faire ?</p>
+        <div class="modal-actions"><button class="btn" data-close="">Annuler</button><button class="btn" data-close="replace">Remplacer</button><button class="btn primary" data-close="append">Ajouter à la suite</button></div>`);
+      if (!c) return;
+      dv.lignes = c === 'replace' ? m.lignes : dv.lignes.concat(m.lignes);
+    } else dv.lignes = m.lignes;
+    if (!dv.chantier.objet && m.objet) { dv.chantier.objet = m.objet; const i = $('[data-bind="chantier.objet"]'); if (i) i.value = m.objet; }
+    if (!dv.chantier.duree && m.duree) { dv.chantier.duree = m.duree; const i = $('[data-bind="chantier.duree"]'); if (i) i.value = m.duree; }
+    touch(dv); renderLines();
+    const manquants = dv.lignes.filter(l => !parseNum(l.pu)).length;
+    toast(manquants ? `Modèle ajouté. Complétez les ${manquants} prix surlignés et ajustez les quantités.` : 'Modèle ajouté avec vos prix. Ajustez les quantités.', 'ok', 5000);
+    $('#lines').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+  'save-modele': async () => {
+    const dv = getDevis(currentId);
+    const lignes = dv.lignes.filter(l => l.designation.trim());
+    if (!lignes.length) { toast('Ajoutez d\'abord des lignes au devis.', 'warn'); return; }
+    window.__lastModeleNom = dv.chantier.objet || 'Mon modèle';
+    const res = await modal(`<h3>Enregistrer comme modèle</h3><p class="modal-msg small">Vous pourrez réutiliser ces ${lignes.length} lignes, avec leurs prix, pour vos prochains devis.</p>
+      <label class="field"><span>Nom du modèle</span><input id="modele-nom" value="${esc(dv.chantier.objet || 'Mon modèle')}"></label>
+      <div class="modal-actions" style="margin-top:16px"><button class="btn" data-close="">Annuler</button><button class="btn primary" data-close="ok">Enregistrer</button></div>`);
+    if (res !== 'ok') return;
+    const nom = (window.__lastModeleNom || dv.chantier.objet || 'Mon modèle').trim();
+    state.modeles.unshift({ id: uid(), nom, objet: dv.chantier.objet, duree: dv.chantier.duree, lignes: lignes.map(l => ({ designation: l.designation, details: l.details, qte: parseNum(l.qte), unite: l.unite, pu: parseNum(l.pu), tva: parseNum(l.tva) })) });
+    save(); toast(`Modèle « ${nom} » enregistré.`);
+  },
+  'del-modele': el => { state.modeles = state.modeles.filter(m => m.id !== el.dataset.id); save(); render(); },
   'add-presta': () => { state.prestations.unshift({ id: uid(), designation: '', unite: 'u', prixHT: 0, tva: state.profil.tvaDefaut ?? 10 }); save(); render(); const i = $('.presta input'); if (i) i.focus(); },
   'del-presta': el => { state.prestations = state.prestations.filter(p => p.id !== el.dataset.id); save(); render(); },
 
@@ -1065,6 +1182,7 @@ function onClick(ev) {
 function onInput(ev) {
   const el = ev.target;
   if (el.matches('textarea')) { if (el.closest('#lines')) autosize(el); }
+  if (el.id === 'modele-nom') { window.__lastModeleNom = el.value; return; }
   if (el.dataset.actionInput === 'search') {
     listSearch = el.value; const pos = el.selectionStart; render();
     const s = $('.search'); if (s) { s.focus(); s.setSelectionRange(pos, pos); }
@@ -1156,7 +1274,9 @@ document.addEventListener('keydown', ev => {
 });
 window.addEventListener('hashchange', render);
 
+setAI(false);
 render();
+detectAI();
 if (!storageOk) setTimeout(() => toast("Ce navigateur n'enregistre pas les données : exportez une sauvegarde avant de fermer.", 'warn', 7000), 800);
 
 // pour les tests automatisés
