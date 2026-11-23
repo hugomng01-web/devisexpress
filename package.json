@@ -1,0 +1,10 @@
+{
+  "name": "devisexpress",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DevisExpress - devis d'artisan en 2 minutes avec l'IA",
+  "scripts": {
+    "dev": "netlify dev"
+  }
+}
