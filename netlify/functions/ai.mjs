@@ -4,9 +4,11 @@
 // pour que personne ne puisse utiliser votre clé API pour autre chose que vos devis.
 //
 // Variables d'environnement (Netlify > Site configuration > Environment variables) :
-//   ANTHROPIC_API_KEY   votre clé Anthropic (recommandé)            — ou —
-//   OPENAI_API_KEY      votre clé OpenAI (avec AI_PROVIDER=openai)
-//   AI_PROVIDER         "anthropic" (par défaut) ou "openai"
+//   ANTHROPIC_API_KEY   votre clé Anthropic                          — ou —
+//   GEMINI_API_KEY      votre clé Google AI Studio (offre gratuite)  — ou —
+//   OPENAI_API_KEY      votre clé OpenAI, ou d'un service compatible (Groq…) avec OPENAI_BASE_URL
+//   AI_PROVIDER         optionnel : "anthropic", "gemini" ou "openai" (sinon déduit de la clé présente)
+//   SANS AUCUNE CLÉ, l'application fonctionne en mode sans IA (modèles et textes automatiques).
 //   AI_MODEL            optionnel : nom du modèle à utiliser
 //   ALLOWED_ORIGIN      optionnel : votre domaine, ex. https://devisexpress.fr
 
@@ -55,7 +57,9 @@ async function callAnthropic(prompt) {
 }
 
 async function callOpenAI(prompt) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  // OPENAI_BASE_URL permet aussi d'utiliser un service compatible (ex. Groq : https://api.groq.com/openai/v1)
+  const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+  const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -68,17 +72,46 @@ async function callOpenAI(prompt) {
   return body.choices?.[0]?.message?.content || '';
 }
 
+// Google Gemini (offre gratuite possible via Google AI Studio)
+async function callGemini(prompt) {
+  const model = process.env.AI_MODEL || 'gemini-flash-latest';
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 2000 } }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${body?.error?.message || 'erreur'}`);
+  return (body.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+}
+
+function currentProvider() {
+  const p = (process.env.AI_PROVIDER || '').toLowerCase();
+  if (p) return p;
+  if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
+  if (process.env.GEMINI_API_KEY) return 'gemini';
+  if (process.env.OPENAI_API_KEY) return 'openai';
+  return 'anthropic';
+}
+function providerHasKey(p) {
+  if (p === 'openai') return !!process.env.OPENAI_API_KEY;
+  if (p === 'gemini') return !!process.env.GEMINI_API_KEY;
+  return !!process.env.ANTHROPIC_API_KEY;
+}
+
 export default async (req, context) => {
   const allowed = process.env.ALLOWED_ORIGIN || '';
   const origin = req.headers.get('origin') || '';
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': allowed || origin || '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST' } });
+    return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': allowed || origin || '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET, POST' } });
   }
+  const provider = currentProvider();
+  const hasKey = providerHasKey(provider);
+  // GET /api/ai : l'application demande simplement si l'IA est disponible
+  if (req.method === 'GET') return json(200, { enabled: hasKey }, allowed);
   if (req.method !== 'POST') return json(405, { error: 'Méthode non autorisée.' });
   if (allowed && origin && origin !== allowed) return json(403, { error: 'Origine non autorisée.' });
 
-  const provider = (process.env.AI_PROVIDER || 'anthropic').toLowerCase();
-  const hasKey = provider === 'openai' ? !!process.env.OPENAI_API_KEY : !!process.env.ANTHROPIC_API_KEY;
   if (!hasKey) return json(503, { error: "L'assistant IA n'est pas encore configuré : ajoutez la clé API dans les réglages Netlify (voir le guide)." }, allowed);
 
   const ip = context?.ip || req.headers.get('x-nf-client-connection-ip') || 'inconnu';
@@ -96,7 +129,7 @@ export default async (req, context) => {
 
   try {
     const prompt = buildPrompt(task, data || {});
-    const text = provider === 'openai' ? await callOpenAI(prompt) : await callAnthropic(prompt);
+    const text = provider === 'openai' ? await callOpenAI(prompt) : provider === 'gemini' ? await callGemini(prompt) : await callAnthropic(prompt);
     return json(200, { text }, allowed);
   } catch (e) {
     console.error('[ai]', e.message);
