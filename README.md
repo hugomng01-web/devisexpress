@@ -35,13 +35,20 @@ devisexpress/
 - **Relances** à J+3, J+7 et J+14 (modifiables) : message email et SMS prêts, personnalisables par l'IA.
 - **Tableau de bord** : devis du mois, en attente, signés, taux de signature.
 - **Sauvegarde** : export et import des données en un clic.
-- Fonctionne **sans IA** : si la clé n'est pas configurée, les lignes sont préparées automatiquement et vous complétez les prix.
+- **Modèles de devis par métier** (plomberie, électricité, peinture, carrelage, menuiserie, chauffage, multi-services) et **modèles personnels** (« Enregistrer comme modèle »).
+- Fonctionne **sans IA** : tant qu'aucune clé n'est configurée, l'application passe toute seule en mode sans IA. Les lignes sont préparées à partir de la description, les prix sont repris de la bibliothèque, le texte de présentation est rédigé automatiquement (3 formulations au choix). Les boutons propres à l'IA sont masqués.
 
 ## 3. Mettre en ligne (environ 30 minutes, sans coder)
 
 Vous aurez besoin de trois comptes gratuits ou presque.
 
-### Étape 1 — Clé API pour l'IA
+### Étape 1 — Clé API pour l'IA (optionnelle)
+
+L'application marche sans clé. Pour activer l'IA, trois possibilités :
+- **Gratuit pour tester : Google Gemini.** Sur aistudio.google.com, « Get API key » → « Create API key ». Dans Netlify, ajoutez `GEMINI_API_KEY`. Attention : en gratuit, Google peut utiliser les demandes pour améliorer ses produits ; passez en payant avant d'y mettre les données de vrais clients.
+- **Groq (gratuit, compatible OpenAI)** : `OPENAI_API_KEY` = votre clé Groq, `OPENAI_BASE_URL` = `https://api.groq.com/openai/v1`, `AI_PROVIDER` = `openai`, `AI_MODEL` = un modèle listé dans la console Groq.
+- **Payant (recommandé pour la production) : Anthropic**, comme ci-dessous.
+
 1. Créez un compte sur **console.anthropic.com** (ou platform.openai.com si vous préférez OpenAI).
 2. Ajoutez un moyen de paiement et un petit crédit (10 € suffisent pour commencer : un devis coûte une fraction de centime avec un modèle rapide).
 3. **Fixez une limite de dépense mensuelle** dans la console (sécurité).
