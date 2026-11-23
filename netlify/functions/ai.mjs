@@ -73,16 +73,48 @@ async function callOpenAI(prompt) {
 }
 
 // Google Gemini (offre gratuite possible via Google AI Studio)
-async function callGemini(prompt) {
-  const model = process.env.AI_MODEL || 'gemini-flash-latest';
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+// En gratuit, un modèle peut être saturé (erreur 503/429) : on essaie alors d'autres modèles
+// « Flash » disponibles pour la clé, trouvés automatiquement auprès de Google.
+const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
+let geminiModelsCache = null;
+let geminiLastGood = null;
+async function geminiFlashModels() {
+  if (geminiModelsCache) return geminiModelsCache;
+  try {
+    const res = await fetch(`${GEMINI}/models?pageSize=200`, { headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY } });
+    const body = await res.json();
+    geminiModelsCache = (body.models || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => String(m.name || '').replace(/^models\//, ''))
+      .filter(n => /flash/i.test(n) && !/(image|tts|audio|live|thinking|exp)/i.test(n));
+  } catch (e) { geminiModelsCache = []; }
+  return geminiModelsCache;
+}
+async function geminiOnce(model, prompt) {
+  const res = await fetch(`${GEMINI}/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
     body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 8000 } }),
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${body?.error?.message || 'erreur'}`);
-  return (body.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  if (!res.ok) { const err = new Error(`Gemini ${model} ${res.status}: ${body?.error?.message || 'erreur'}`); err.status = res.status; throw err; }
+  const text = (body.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  if (!text) { const err = new Error(`Gemini ${model}: réponse vide`); err.status = 502; throw err; }
+  return text;
+}
+async function callGemini(prompt) {
+  const preferred = [process.env.AI_MODEL, geminiLastGood, 'gemini-flash-latest', 'gemini-flash-lite-latest'].filter(Boolean);
+  const tried = new Set();
+  let lastErr;
+  const attempt = async (model) => {
+    if (tried.has(model)) return null;
+    tried.add(model);
+    try { const t = await geminiOnce(model, prompt); geminiLastGood = model; return t; }
+    catch (e) { lastErr = e; console.error('[ai]', e.message); if (e.status === 400 || e.status === 401 || e.status === 403) throw e; return null; }
+  };
+  for (const m of preferred) { const t = await attempt(m); if (t) return t; }
+  for (const m of (await geminiFlashModels()).slice(0, 6)) { const t = await attempt(m); if (t) return t; }
+  throw lastErr || new Error('Gemini indisponible');
 }
 
 function currentProvider() {
