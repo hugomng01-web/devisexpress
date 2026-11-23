@@ -155,6 +155,13 @@ function cap(name) {
   return caps[name];
 }
 
+// Remet le nom du client dans un texte rédigé par l'IA (l'IA ne le reçoit jamais)
+function personnaliser(texte, nom) {
+  const n = String(nom || '').trim();
+  if (!n || /\b(sci|sarl|sas|eurl|sasu|syndic|copropri|société|mairie|agence)\b/i.test(n)) return texte;
+  return texte.replace(/^(Madame, Monsieur|Bonjour Madame, Monsieur|Bonjour)\s*,/, `Bonjour ${n},`);
+}
+
 class AIError extends Error { constructor(msg, code) { super(msg); this.code = code; } }
 async function askAI(task, data) {
   const sample = await cap('sample');
@@ -1021,10 +1028,11 @@ const actions = {
     if (!dv.lignes.length && !dv.chantier.objet && !dv.description) { toast('Indiquez au moins l\'objet ou les prestations du chantier.', 'warn'); return; }
     try {
       const txt = await askAI('intro', {
-        entreprise: state.profil.nom, metier: state.profil.metier, client: dv.client.nom, objet: dv.chantier.objet || dv.description.slice(0, 200),
+        // confidentialité : le nom du client n'est jamais envoyé à l'IA, il est ajouté ensuite sur l'appareil
+        entreprise: state.profil.nom, metier: state.profil.metier, client: '', objet: dv.chantier.objet || dv.description.slice(0, 200),
         dateDebut: dv.chantier.dateDebut ? fmtDate(dv.chantier.dateDebut) : '', duree: dv.chantier.duree, lignes: dv.lignes,
       });
-      dv.intro = txt.trim(); touch(dv);
+      dv.intro = personnaliser(txt.trim(), dv.client.nom); touch(dv);
       const ta = $('[data-bind="intro"]'); if (ta) ta.value = dv.intro;
       refreshDerived(); toast('Texte rédigé. Relisez-le et ajustez si besoin.');
     } catch (e) { toast(e.message || 'IA indisponible.', 'warn', 6000); }
@@ -1085,10 +1093,10 @@ const actions = {
     const d = getDevis(el.dataset.id); const ta = $('#rt-' + d.id);
     try {
       const txt = await askAI('relance', {
-        niveau: el.dataset.niveau, canal: ta.dataset.kind, artisan: state.profil.nom, tel: state.profil.tel, client: d.client.nom,
+        niveau: el.dataset.niveau, canal: ta.dataset.kind, artisan: state.profil.nom, tel: state.profil.tel, client: '',
         numero: d.numero, dateEnvoi: fmtDate(d.dateEnvoi), objet: d.chantier.objet, montant: fmtMoney(computeTotals(d).ttc), validite: fmtDate(validiteDate(d)),
       });
-      ta.value = txt.trim(); updateRelanceLinks(d.id);
+      ta.value = personnaliser(txt.trim(), d.client.nom); updateRelanceLinks(d.id);
     } catch (e) { toast(e.message || 'IA indisponible.', 'warn', 6000); }
   }),
   'relance-done': el => {

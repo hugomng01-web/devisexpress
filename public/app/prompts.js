@@ -46,7 +46,7 @@ ${lignes || '(non précisées)'}
 ${d.consigne ? `Consigne de l'artisan : ${clip(d.consigne, 300)}\n` : ''}
 Règles :
 - 3 à 5 phrases, vouvoiement, ton professionnel, chaleureux et rassurant, sans superlatifs creux.
-- Commence par "Madame, Monsieur," ou "Bonjour ${clip(d.client, 60) || ''}," selon que le nom du client est connu.
+- Commence exactement par "Madame, Monsieur," (le nom du client sera ajouté ensuite).
 - Reformule le besoin du client, résume ce qui est prévu, mentionne le soin apporté au chantier (propreté, respect des délais).
 - N'invente AUCUNE certification, garantie, label, prix ou date qui ne figure pas ci-dessus.
 - Termine en invitant à retourner le devis signé ou à appeler pour toute question.
@@ -62,11 +62,10 @@ function promptRelance(d) {
 Relance n°${Number(d.niveau) || 1} sur 3 (1 = simple prise de nouvelles, 2 = proposer de réserver une date, 3 = dernière relance polie).
 Canal : ${d.canal === 'sms' ? 'SMS (max 300 caractères)' : 'email (avec une première ligne "Objet : ...")'}
 Artisan : ${clip(d.artisan, 120)} — téléphone : ${clip(d.tel, 30)}
-Client : ${clip(d.client, 120)}
 Devis n°${clip(d.numero, 40)} du ${clip(d.dateEnvoi, 20)} — ${clip(d.objet, 200)} — montant ${clip(d.montant, 30)} TTC
 Valable jusqu'au : ${clip(d.validite, 20)}
 ${d.consigne ? `Consigne de l'artisan : ${clip(d.consigne, 300)}\n` : ''}
-Règles : vouvoiement, court, humain, jamais insistant ni culpabilisant, aucune information inventée. Pas de markdown.
+Règles : vouvoiement, court, humain, jamais insistant ni culpabilisant, aucune information inventée. Pas de markdown. Si tu salues le client, écris exactement "Bonjour," (son nom sera ajouté ensuite).
 Réponds uniquement avec le message.`;
 }
 
