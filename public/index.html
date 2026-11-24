@@ -8,9 +8,7 @@
 <meta property="og:title" content="DevisExpress — vos devis d'artisan en 2 minutes">
 <meta property="og:description" content="Dictez votre chantier, l'IA rédige le devis. Relances clients incluses.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231d4ed8'/%3E%3Cpath d='M9 8h8l6 6v10H9z' fill='%23fff'/%3E%3Cpath d='M17 8v6h6' fill='%23f59e0b'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/inter.css">
 <style>
 :root { --ink:#0f172a; --ink2:#334155; --muted:#64748b; --line:#e2e8f0; --brand:#1d4ed8; --brand-d:#1e3a8a; --accent:#f59e0b; --bg:#f8fafc; }
 * { box-sizing:border-box; } html { scroll-behavior:smooth; }
@@ -36,17 +34,6 @@ header.top .wrap { display:flex; align-items:center; justify-content:space-betwe
 .hero p.lead { font-size:19px; color:#cbd5e1; margin:0 0 30px; max-width:540px; }
 .hero .ctas { display:flex; gap:12px; flex-wrap:wrap; }
 .hero small { display:block; color:#94a3b8; margin-top:16px; font-size:14px; }
-.mock { position:relative; }
-.mock-paper { background:#fff; color:#1f2937; border-radius:10px; padding:26px; box-shadow:0 30px 80px rgba(0,0,0,.45); transform:rotate(1.5deg); font-size:12px; }
-.mock-paper .h { display:flex; justify-content:space-between; margin-bottom:14px; } .mock-paper .h b { font-size:13px; } .mock-paper .h span { color:#1d4ed8; font-weight:800; font-size:22px; }
-.mock-paper .obj { font-weight:700; margin:8px 0 10px; font-size:13px; }
-.mock-paper table { width:100%; border-collapse:collapse; } .mock-paper th { background:#1d4ed8; color:#fff; font-size:10.5px; padding:5px 7px; text-align:right; } .mock-paper th:first-child, .mock-paper td:first-child { text-align:left; }
-.mock-paper td { padding:6px 7px; border-bottom:1px solid #e5e7eb; text-align:right; font-size:11px; }
-.mock-paper .tot { margin:10px 0 0 auto; width:55%; } .mock-paper .tot div { display:flex; justify-content:space-between; padding:2px 0; }
-.mock-paper .ttc { background:#1d4ed8; color:#fff; font-weight:700; padding:6px 8px !important; border-radius:4px; margin-top:4px; }
-.bubble { position:absolute; z-index:2; background:#fff; color:var(--ink); border-radius:14px; padding:12px 14px; box-shadow:0 14px 40px rgba(0,0,0,.35); font-size:13.5px; font-weight:500; display:flex; gap:10px; align-items:center; max-width:270px; }
-.bubble i { font-style:normal; font-size:20px; }
-.b1 { top:-26px; left:-30px; transform:rotate(-2deg); } .b2 { bottom:-30px; right:-14px; }
 section { padding:84px 0; }
 .kicker { color:var(--brand); font-weight:700; font-size:14px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; }
 h2 { font-size:clamp(28px,3.6vw,40px); line-height:1.15; letter-spacing:-.03em; margin:0 0 16px; }
@@ -84,39 +71,65 @@ details p { margin:12px 0 0; color:var(--ink2); }
 footer { background:#0f172a; color:#94a3b8; padding:36px 0; font-size:14px; }
 footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; } footer a { color:#cbd5e1; text-decoration:none; margin-left:18px; }
 @media (max-width:900px) {
-  .hero .wrap, .grid3, .grid2, .prices { grid-template-columns:1fr; }
-  .mock { margin-top:30px; } .b1 { left:0; } .b2 { right:0; }
+  .hero .wrap, .grid3, .grid2, .prices { grid-template-columns:minmax(0,1fr); }
+  .hero .wrap { gap:24px; }
   .top nav a:not(.btn) { display:none; }
   section { padding:64px 0; }
   footer a { margin:0 14px 0 0; }
+}
+
+.demo-player { min-width:0; margin:0; }
+.demo-player figcaption { margin-bottom:10px; font-weight:700; }
+.demo-player video { display:block; background:#10192c; width:100%; aspect-ratio:16/9; border-radius:14px; }
+.reviews { background: #f5f8ff; }
+.review-form { margin:16px 0; max-width:740px; border:1px solid #dbe5f5; border-radius:14px; background:#fff; padding:16px 20px; }
+.review-form summary,#usage-preferences summary { cursor:pointer; font-weight:600; }
+.review-form form,#usage-preferences form { display:grid; gap:14px; padding:14px 0; }
+.review-form label:not(.check) { display:grid; gap:4px; }
+.review-form .stars { display:flex; flex-wrap:wrap; gap:14px; }
+.review-form .stars label { display:flex; align-items:center; gap:5px; }
+.review-form fieldset { border:1px solid #dbe5f5; border-radius:8px; }
+.review-form input:not([type=checkbox]):not([type=radio]),.review-form select,.review-form textarea { width:100%; font:inherit; border:1px solid #a7b7cf; padding:9px; border-radius:8px; }
+.check { align-items:start; gap:8px; }
+.check:not([hidden]) { display:flex; }
+#review-result,#withdraw-result { overflow-wrap:anywhere; }
+.review-card { overflow-wrap:anywhere; }
+.review-rating { color:#a45510; letter-spacing:.13em; font-weight:700; }
+#usage-preferences { display:inline-block; margin-left:12px; vertical-align:top; }
+#usage-preferences[open] { display:block; margin:12px 0; }
+#usage-preferences form { max-width:340px; }
+@media (max-width:600px) {
+  header .wrap { gap:8px; padding-inline:12px; }
+  .wrap { padding-inline:16px; }
+  .hero { padding:34px 0 40px; }
+  .hero h1 { font-size:clamp(28px, 8vw, 36px); margin-bottom:12px; }
+  .hero p.lead { font-size:16px; margin-bottom:16px; }
+  .hero .ctas { gap:8px; }
+  .hero .ctas .btn { justify-content:center; min-height:44px; padding:8px 12px; font-size:.9rem; }
+  .hero small { margin-top:12px; font-size:.8rem; }
+  .top nav .btn { padding:9px 8px; font-size:.76rem; white-space:nowrap; text-align:center; }
+  header .logo { font-size:1rem; gap:5px; }
+  .review-form { padding:12px; }
 }
 </style>
 </head>
 <body>
 <header class="top"><div class="wrap">
   <a class="logo" href="#"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#1d4ed8"/><path d="M9 8h8l6 6v10H9z" fill="#fff"/><path d="M17 8v6h6" fill="#f59e0b"/></svg>Devis<b>Express</b></a>
-  <nav><a href="#comment">Comment ça marche</a><a href="#demo">Démo</a><a href="#faq">Questions</a><a class="btn btn-primary" href="app/">Commencer gratuitement</a></nav>
+  <nav><a href="#comment">Comment ça marche</a><a href="#avis">Avis</a><a href="#faq">Questions</a><a class="btn btn-primary" href="app/">Commencer gratuitement</a></nav>
 </div></header>
 
 <section class="hero"><div class="wrap">
   <div>
-    <span class="pill">Pour les artisans qui préfèrent le chantier à la paperasse</span>
-    <h1>Votre devis pro en <em>2 minutes</em>. Suivez vos relances.</h1>
-    <p class="lead">Dictez votre chantier depuis le camion. DevisExpress rédige un devis clair et soigné en PDF, avec vos prix, puis vous dit quand et comment relancer le client.</p>
-    <div class="ctas"><a class="btn btn-primary" href="app/">Commencer gratuitement</a><a class="btn btn-ghost" href="#comment">Voir comment ça marche</a></div>
-    <small>Gratuit pendant le lancement · Sans carte bancaire · Sans engagement · Sans compte obligatoire</small>
+    <h1>Votre devis pro en <em>2 minutes</em>. Vos relances au bon moment.</h1>
+    <p class="lead">Dictez votre chantier, préparez le devis PDF avec vos prix et retrouvez les clients à relancer.</p>
+    <div class="ctas"><a class="btn btn-primary" href="app/">Commencer gratuitement</a><a class="btn btn-ghost" href="app/?compte=creer">Créer mon compte gratuit</a></div>
+    <small>Gratuit pendant le lancement · Sans carte bancaire, engagement ni compte obligatoire</small>
   </div>
-  <div class="mock" aria-hidden="true">
-    <div class="bubble b1"><i>🎙️</i>« Remplacement chauffe-eau 200 L, dépose de l'ancien, 3 h de main-d'œuvre »</div>
-    <div class="mock-paper">
-      <div class="h"><div><b>Dupont Plomberie</b><br><span style="color:#64748b;font-size:10px;font-weight:400">14 rue Paul Bert, 69003 Lyon</span></div><span>DEVIS</span></div>
-      <div class="obj">Objet : Remplacement du chauffe-eau</div>
-      <table><thead><tr><th>Désignation</th><th>Qté</th><th>Total HT</th></tr></thead>
-      <tbody><tr><td>Chauffe-eau électrique 200 L</td><td>1 u</td><td>520,00 €</td></tr><tr><td>Dépose et évacuation de l'ancien</td><td>1 forfait</td><td>90,00 €</td></tr><tr><td>Groupe de sécurité</td><td>1 u</td><td>45,00 €</td></tr><tr><td>Main-d'œuvre plombier</td><td>3 h</td><td>165,00 €</td></tr></tbody></table>
-      <div class="tot"><div><span>Total HT</span><span>820,00 €</span></div><div><span>TVA 10 %</span><span>82,00 €</span></div><div class="ttc"><span>Total TTC</span><span>902,00 €</span></div></div>
-    </div>
-    <div class="bubble b2"><i>🔔</i>Relance prévue pour M. Martin aujourd'hui — message prêt</div>
-  </div>
+  <figure id="demo" class="demo-player">
+    <figcaption>Voir la démonstration</figcaption>
+    <video controls playsinline preload="none" poster="/assets/demo-poster.webp" src="/demo.mp4" aria-label="Démonstration de DevisExpress, avec sous-titres intégrés"></video>
+  </figure>
 </div></section>
 
 <section class="pains"><div class="wrap">
@@ -135,9 +148,9 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   <h2>Trois étapes, deux minutes.</h2>
   <p class="sub">Vous remplissez votre profil une seule fois : nom, SIRET, assurance, logo. Ensuite, chaque devis se fait en un clin d'œil.</p>
   <div class="grid3 steps">
-    <div class="step"><h3>Décrivez ou dictez le chantier</h3><p>Comme vous l'expliqueriez à un collègue. Depuis votre téléphone, sur place, ou au bureau.</p></div>
+    <div class="step"><h3>Décrivez ou dictez le chantier</h3><p>Comme vous l'expliqueriez à un collègue. Depuis votre téléphone, sur place ou au bureau, si votre navigateur prend en charge la dictée.</p></div>
     <div class="step"><h3>L'IA rédige le devis</h3><p>Lignes, quantités, vos prix habituels, texte de présentation. Vous vérifiez, vous ajustez, c'est vous qui décidez.</p></div>
-    <div class="step"><h3>Envoyez, on suit pour vous</h3><p>PDF prêt à envoyer. DevisExpress vous rappelle quand relancer et vous donne le message, par email ou SMS.</p></div>
+    <div class="step"><h3>Exportez le PDF et planifiez vos relances</h3><p>PDF prêt à envoyer. Retrouvez les relances à faire et copiez le message à envoyer par email ou SMS.</p></div>
   </div>
 </div></section>
 
@@ -155,8 +168,6 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   </div>
 </div></section>
 
-<section id="demo"><div class="wrap center"><h2>Voir DevisExpress en action</h2><video controls playsinline preload="none" style="width:100%;max-width:820px;border-radius:16px" src="/demo.mp4"></video></div></section>
-
 <section class="faq" id="faq"><div class="wrap">
   <div class="kicker center">Questions fréquentes</div>
   <h2 class="center">Vous vous demandez sûrement…</h2>
@@ -164,18 +175,62 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   <details><summary>Les mentions obligatoires sont-elles sur le devis ?</summary><p>Le devis intègre les mentions courantes : identité et SIRET, date et durée de validité, détail des prestations, HT/TVA/TTC, conditions de paiement, assurance professionnelle, médiateur et zone de signature. Les obligations varient selon votre statut et votre métier : faites valider votre modèle une fois par votre comptable.</p></details>
   <details><summary>Je suis en micro-entreprise, sans TVA. Ça marche ?</summary><p>Oui : choisissez « Franchise en base » dans votre profil. La TVA disparaît et la mention « TVA non applicable, art. 293 B du CGI » est ajoutée automatiquement.</p></details>
   <details><summary>Faut-il installer quelque chose ?</summary><p>Non, tout se passe dans le navigateur, sur téléphone comme sur ordinateur.</p></details>
-  <details><summary>Où sont stockées mes données ?</summary><p>Vos devis restent sur votre appareil. Vous pouvez exporter une sauvegarde à tout moment depuis votre profil.</p></details>
+  <details><summary>Où sont stockées mes données ?</summary><p>Sans compte, vos devis restent sur cet appareil. Un compte gratuit vous permet de les sauvegarder et de les retrouver sur vos autres appareils. Vous pouvez toujours exporter une sauvegarde depuis votre profil.</p></details>
 </div></section>
 
 <section class="final"><div class="wrap">
   <h2>Votre prochain devis peut partir dans 2 minutes.</h2>
-  <p>DevisExpress est gratuit pendant son lancement.</p>
+  <p>DevisExpress est gratuit pendant sa phase de lancement.</p>
   <a class="btn btn-primary" href="app/">Commencer gratuitement</a>
 </div></section>
 
+<section class="reviews" id="avis"><div class="wrap">
+  <h2>Ils ont testé DevisExpress</h2>
+  <p class="sub">Les avis sont modérés avant publication et affichés du plus récent au plus ancien.</p>
+  <p id="review-empty" class="sub" aria-live="polite">Partagez votre expérience avec les prochains utilisateurs.</p>
+  <div id="review-list" class="grid3"></div>
+  <details class="review-form"><summary>Laisser un avis</summary>
+    <form id="review-form">
+      <fieldset><legend>Votre note</legend><div class="stars">
+        <label><input required type="radio" name="rating" value="1"> 1 ★</label>
+        <label><input type="radio" name="rating" value="2"> 2 ★</label>
+        <label><input type="radio" name="rating" value="3"> 3 ★</label>
+        <label><input type="radio" name="rating" value="4"> 4 ★</label>
+        <label><input type="radio" name="rating" value="5"> 5 ★</label>
+      </div></fieldset>
+      <div class="grid2">
+        <label>Prénom ou pseudonyme<input required name="author" maxlength="60"></label>
+        <label>Métier ou profil<input required name="trade" maxlength="80"></label>
+        <label>Entreprise (facultatif)<input name="company" maxlength="100"></label>
+        <label>Vous vous déclarez<select required name="profile"><option value="">Choisir</option><option value="professionnel">Artisan / professionnel</option><option value="beta">Bêta-testeur</option></select></label>
+      </div>
+      <label>Date d’utilisation<input required type="date" name="experienceDate"></label>
+      <label>Votre expérience<textarea required name="comment" rows="4" minlength="10" maxlength="1200"></textarea></label>
+      <div hidden><input name="website" tabindex="-1" autocomplete="off"></div>
+      <label class="check"><input required type="checkbox" name="consent"> J’autorise la publication des informations saisies et de mon avis après modération. Je peux demander son retrait.</label>
+      <button class="btn btn-primary">Envoyer mon avis</button>
+      <p id="review-result" role="status"></p>
+    </form>
+  </details>
+  <details class="review-form"><summary>Retirer mon avis</summary><form id="review-withdraw">
+    <label>Code de retrait<input required name="receipt" maxlength="120"></label>
+    <button class="btn btn-outline">Demander le retrait</button>
+    <p id="withdraw-result" role="status"></p>
+  </form></details>
+</div></section>
 <footer><div class="wrap">
   <span>© DevisExpress</span>
-  <span><a href="mentions-legales.html">Mentions légales</a><a href="cgu.html">CGU</a><a href="confidentialite.html">Confidentialité</a><a href="mailto:contact@votre-domaine.fr">Contact</a></span>
+  <span><a href="mentions-legales.html">Mentions légales</a><a href="cgu.html">CGU</a><a href="confidentialite.html">Confidentialité</a><details id="usage-preferences"><summary>Préférences de mesure</summary>
+  <form>
+    <label class="check"><input type="checkbox" name="consent"> Participer à la mesure d’usage facultative</label>
+    <label hidden><input type="checkbox" name="test"> Mode test</label>
+    <label hidden>Profil <select name="profile"><option value="non_renseigne">Non renseigné</option><option value="professionnel">Professionnel</option><option value="beta">Bêta-testeur</option></select></label>
+    <button class="btn btn-outline">Enregistrer</button>
+    <button type="button" class="btn btn-outline" data-erase-usage>Retirer et effacer mes mesures</button>
+    <output aria-live="polite"></output>
+  </form>
+</details></span>
 </div></footer>
+<script type="module" src="/landing.js"></script>
 </body>
 </html>

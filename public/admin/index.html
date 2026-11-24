@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>DevisExpress Analytics</title>
+<link rel="stylesheet" href="/assets/inter.css">
+<link rel="stylesheet" href="./analytics.css">
+</head>
+<body>
+<header><div class="wrap header"><div><span class="brand">Devis<strong>Express</strong></span><h1>Analytics</h1></div><a href="/app/?compte=connexion">Retour à l’application</a></div></header>
+<main class="wrap">
+  <p id="admin-status" role="status">Vérification de l’accès…</p>
+  <div id="dashboard" hidden>
+    <nav aria-label="DevisExpress Analytics">
+      <button id="show-stats" aria-pressed="true">Statistiques</button>
+      <button id="show-reviews" aria-pressed="false">Avis utilisateurs</button>
+    </nav>
+    <section id="stats">
+      <div class="toolbar"><h2>Utilisation</h2><label>Période <select id="period"><option value="1">Aujourd’hui</option><option selected value="7">7 jours</option><option value="30">30 jours</option><option value="0">Depuis le lancement</option></select></label><button id="csv" disabled>Exporter le CSV</button></div>
+      <p class="muted">Mesures des utilisateurs ayant donné leur accord. Un navigateur peut correspondre à un appareil partagé ou à une même personne sur plusieurs appareils.</p>
+      <div id="metrics" class="metrics"></div>
+      <div class="panel"><h3>Évolution quotidienne</h3><p class="muted">Derniers 30 jours de la période affichée. Le CSV contient tous les jours de la période couverte.</p><div id="chart"></div></div>
+    </section>
+    <section id="moderation" hidden>
+      <div class="toolbar"><h2>Avis utilisateurs</h2><label>Statut <select id="review-status"><option value="pending">En attente</option><option value="published">Publiés</option><option value="rejected">Refusés</option><option value="withdrawn">Retirés</option></select></label></div>
+      <p class="muted">Les profils sont déclaratifs. La modération porte sur l’authenticité, le spam et les contenus abusifs. Une note faible n’est pas un motif de refus.</p>
+      <div id="review-queue"></div>
+      <div class="toolbar"><button id="earlier" disabled>Page précédente</button><button id="later" disabled>Page suivante</button></div>
+    </section>
+  </div>
+</main>
+<script type="module" src="./analytics.js"></script>
+</body>
+</html>

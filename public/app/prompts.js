@@ -66,7 +66,7 @@ Devis n°${clip(d.numero, 40)} du ${clip(d.dateEnvoi, 20)} — ${clip(d.objet, 2
 Valable jusqu'au : ${clip(d.validite, 20)}
 ${d.consigne ? `Consigne de l'artisan : ${clip(d.consigne, 300)}\n` : ''}
 Règles : vouvoiement, court, humain, jamais insistant ni culpabilisant, aucune information inventée. Pas de markdown. Si tu salues le client, écris exactement "Bonjour," (son nom sera ajouté ensuite).
-Réponds uniquement avec le message.`;
+Conserve les variables entre crochets à l'identique lorsque tu les utilises. Réponds uniquement avec le message.`;
 }
 
 export function buildPrompt(task, data) {

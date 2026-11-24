@@ -3,6 +3,8 @@
 import { buildPrompt, parseJSON } from './prompts.js';
 import { generatePDF } from './pdf.js';
 import { MODELES, texteIntro } from './modeles.js';
+import { setupAccount } from './account.js';
+import { setupPrivacy, track, isTestMode } from '../telemetry.js';
 
 /* =========================================================
    Constantes
@@ -79,7 +81,7 @@ const defaultState = () => ({ version: 1, profil: defaultProfil(), prestations: 
 /* =========================================================
    Utilitaires
    ========================================================= */
-const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+const uid = () => crypto.randomUUID();
 const r2 = n => Math.round((Number(n) || 0) * 100 + Number.EPSILON * 100) / 100;
 function parseNum(v) {
   if (typeof v === 'number') return isFinite(v) ? v : 0;
@@ -131,16 +133,22 @@ function migrate(s) {
   return s;
 }
 let state = load();
-let saveTimer = null, warnedStorage = false;
+let account, cloudMode = false, warnedStorage = false;
 function save() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); storageOk = true; }
-    catch (e) {
-      storageOk = false;
-      if (!warnedStorage) { warnedStorage = true; toast("Ce navigateur n'enregistre pas les données : pensez à exporter une sauvegarde (Profil > Sauvegarde).", 'warn', 7000); }
+  if (cloudMode) { account.changed(); return; }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); storageOk = true; }
+  catch {
+    storageOk = false;
+    if (!warnedStorage) {
+      warnedStorage = true;
+      toast("Ce navigateur n’enregistre pas les données. Exportez une sauvegarde depuis le profil.", 'warn', 7000);
     }
-  }, 250);
+  }
+}
+const demoState = () => state.demo === true || state.profil.nom === 'Dupont Plomberie';
+const testQuote = quote => demoState() || quote?.dxTest === true || isTestMode();
+function quoteEvent(kind, quote, id = quote.id) {
+  track(kind, id, testQuote(quote));
 }
 
 /* =========================================================
@@ -163,7 +171,28 @@ function personnaliser(texte, nom) {
 }
 
 class AIError extends Error { constructor(msg, code) { super(msg); this.code = code; } }
-async function askAI(task, data) {
+function cleanAIData(value, quote) {
+  const known = [quote?.client?.nom, quote?.client?.email, quote?.client?.tel, quote?.client?.adresse,
+    quote?.chantier?.adresse, state.profil.nom, state.profil.adresse, state.profil.email, state.profil.tel]
+    .filter(item => typeof item === 'string' && item.trim().length >= 3)
+    .map(item => item.trim()).sort((a, b) => b.length - a.length);
+  const clean = input => {
+    if (typeof input === 'string') {
+      let text = input.replace(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[email]')
+        .replace(/(?<!\w)(?:\+33[ .-]?(?:\(0\))?|0)[1-9](?:[ .-]?\d{2}){4}(?!\w)/g, '[téléphone]')
+        .replace(/\b\d{1,5}(?:\s+(?:bis|ter))?\s+(?:rue|avenue|boulevard|allée|place|route|chemin|impasse)\s+[^,;\n.]{3,70}/gi, '[adresse]');
+      for (const item of known) text = text.replace(new RegExp(item.replace(/[.*+?^$${}()|[\]\\]/g, '\\$&'), 'gi'), '[masqué]');
+      return text;
+    }
+    if (Array.isArray(input)) return input.map(clean);
+    if (input && typeof input === 'object') return Object.fromEntries(Object.entries(input).map(([key, item]) => [key, clean(item)]));
+    return input;
+  };
+  return clean(value);
+}
+
+async function askAI(task, data, quote) {
+  data = cleanAIData(data, quote);
   const sample = await cap('sample');
   if (sample) {
     try {
@@ -182,6 +211,7 @@ async function askAI(task, data) {
   let body = {};
   try { body = await res.json(); } catch (e) { /* réponse non JSON */ }
   if (!res.ok) throw new AIError(body.error || "L'assistant IA n'est pas configuré sur ce site (voir le guide de mise en ligne).", 'server');
+  track('ia', undefined, testQuote(quote));
   return body.text || '';
 }
 
@@ -339,7 +369,7 @@ function createDevis() {
     chantier: { objet: '', adresse: '', dateDebut: '', duree: '' },
     description: '', intro: '', lignes: [], remisePct: 0, acomptePct: p.acompteDefaut ?? 30,
     validiteJours: p.validiteJours ?? 30, notes: '', dateEnvoi: null, relances: [],
-    createdAt: Date.now(), updatedAt: Date.now(),
+    createdAt: Date.now(), updatedAt: Date.now(), dxTest: demoState() || isTestMode(),
   };
   state.devis.unshift(dv);
   save();
@@ -621,7 +651,7 @@ function viewEditeur() {
         <h2>${icon('spark')} <span data-ai>Décrivez le chantier, l'IA rédige les lignes</span><span data-noai>Décrivez le chantier, l'outil prépare les lignes</span></h2>
         <p class="muted small">Écrivez comme vous parlez, une prestation par ligne ou séparées par des virgules. Exemple : « Remplacement chauffe-eau 200 L, dépose de l'ancien, 3 h de main-d'œuvre, déplacement ». <span data-noai>Ou partez d'un modèle de votre métier.</span></p>
         <div class="ai-input">
-          <textarea id="ai-desc" data-bind="description" rows="4" placeholder="Décrivez les travaux à réaliser…">${esc(dv.description)}</textarea>
+          <textarea id="ai-desc" aria-describedby="ai-privacy" data-bind="description" rows="4" placeholder="Décrivez les travaux à réaliser…">${esc(dv.description)}</textarea><p id="ai-privacy" class="muted small">Pour l’assistant IA, décrivez les travaux sans nom, adresse, email ni téléphone.</p><label class="dx-declare"><input type="checkbox" data-professional ${dv.dxProfessional ? 'checked disabled' : ''} ${testQuote(dv) ? 'disabled' : ''}> Déclarer ce devis comme professionnel pour les statistiques facultatives</label>
           ${dictationAvailable() ? `<button class="btn mic" data-action="dictate">${icon('mic')}<span>Dicter</span></button>` : ''}
         </div>
         <div class="row-gap">
@@ -886,7 +916,7 @@ function viewProfil() {
 
   <section class="card">
     <h2>${icon('save')} Sauvegarde</h2>
-    <p class="muted small">Vos données sont enregistrées sur cet appareil, dans ce navigateur. Exportez une sauvegarde régulièrement, ou pour passer sur un autre appareil.</p>
+    <p class="muted small">${cloudMode ? 'Les données de cet espace sont enregistrées dans votre compte. Vous pouvez en exporter une copie.' : 'Vos données sont enregistrées dans ce navigateur. Exportez une sauvegarde pour les conserver ou les transférer.'}</p>
     <div class="row-gap wrap">
       <button class="btn" data-action="export">${icon('download')} Exporter mes données</button>
       <label class="btn">${icon('upload')} Importer une sauvegarde<input type="file" accept="application/json,.json" data-action-file="import" hidden></label>
@@ -900,6 +930,7 @@ function viewProfil() {
    ========================================================= */
 function loadDemo() {
   const s = defaultState();
+  s.demo = true;
   Object.assign(s.profil, {
     nom: 'Dupont Plomberie', metier: 'Plombier-chauffagiste', formeJuridique: 'EURL', capital: '5 000 €',
     adresse: '14 rue Paul Bert', cp: '69003', ville: 'Lyon', tel: '06 12 34 56 78', email: 'contact@dupont-plomberie.fr',
@@ -916,7 +947,7 @@ function loadDemo() {
     { id: uid(), designation: 'Recherche de fuite', unite: 'forfait', prixHT: 150, tva: 10 },
   ];
   const prev = state; state = s;
-  const mk = (o, lignes) => { const d = createDevis(); Object.assign(d, o); d.lignes = lignes.map(l => newLigne(l)); return d; };
+  const mk = (o, lignes) => { const d = createDevis(); Object.assign(d, o, { dxTest: true }); d.lignes = lignes.map(l => newLigne(l)); return d; };
   const today = isoLocal();
   mk({ statut: 'signe', date: addDays(today, -20), dateEnvoi: addDays(today, -20), client: { nom: 'Mme Bernard', email: 'bernard@exemple.fr', tel: '06 00 00 00 01', adresse: '3 place Bellecour', cp: '69002', ville: 'Lyon' }, chantier: { objet: 'Recherche et réparation de fuite', adresse: '', dateDebut: '', duree: '1 jour' } },
     [{ designation: 'Recherche de fuite', unite: 'forfait', qte: 1, pu: 150 }, { designation: 'Main-d\'œuvre plombier', unite: 'h', qte: 2, pu: 55 }, { designation: 'Déplacement', unite: 'forfait', qte: 1, pu: 35 }]);
@@ -944,10 +975,13 @@ async function withBusy(btn, label, fn) {
 
 const actions = {
   'nav': el => go(el.dataset.view),
-  'new-devis': () => { const d = createDevis(); go('editeur', d.id); },
+  'new-devis': () => { const d = createDevis(); quoteEvent('devis', d); go('editeur', d.id); },
   'open-devis': el => go('editeur', el.dataset.id),
   'filter': el => { listFilter = el.dataset.f; render(); },
-  'load-demo': () => { loadDemo(); toast('Exemple chargé : modifiez le profil à votre nom quand vous voulez.'); render(); },
+  'load-demo': async () => {
+    if (cloudMode) { toast('Ouvrez le mode sans compte pour charger un exemple.', 'warn'); return; }
+    if (state.devis.length && !await confirmBox('Remplacer les données locales par un exemple ? Exportez une sauvegarde avant de continuer.')) return;
+    loadDemo(); toast('Exemple chargé : modifiez le profil à votre nom quand vous voulez.'); render(); },
 
   'add-line': () => {
     const dv = getDevis(currentId); dv.lignes.push(newLigne()); touch(dv); renderLines();
@@ -977,7 +1011,7 @@ const actions = {
     if (!aiOn) {
       lignes = localParse(dv.description);
     } else try {
-      const txt = await askAI('lignes', { description: dv.description, metier: state.profil.metier, bibliotheque: state.prestations });
+      const txt = await askAI('lignes', { description: dv.description, metier: state.profil.metier, bibliotheque: [], }, dv);
       const data = parseJSON(txt);
       if (!data || !Array.isArray(data.lignes)) throw new AIError('Réponse de l\'IA illisible.', 'parse');
       objet = String(data.objet || '').slice(0, 150);
@@ -1029,9 +1063,9 @@ const actions = {
     try {
       const txt = await askAI('intro', {
         // confidentialité : le nom du client n'est jamais envoyé à l'IA, il est ajouté ensuite sur l'appareil
-        entreprise: state.profil.nom, metier: state.profil.metier, client: '', objet: dv.chantier.objet || dv.description.slice(0, 200),
-        dateDebut: dv.chantier.dateDebut ? fmtDate(dv.chantier.dateDebut) : '', duree: dv.chantier.duree, lignes: dv.lignes,
-      });
+        entreprise: '', metier: state.profil.metier, client: '', objet: dv.chantier.objet || dv.description.slice(0, 200),
+        dateDebut: '', duree: dv.chantier.duree, lignes: dv.lignes.map(({ designation, qte, unite }) => ({ designation, qte, unite })),
+      }, dv);
       dv.intro = personnaliser(txt.trim(), dv.client.nom); touch(dv);
       const ta = $('[data-bind="intro"]'); if (ta) ta.value = dv.intro;
       refreshDerived(); toast('Texte rédigé. Relisez-le et ajustez si besoin.');
@@ -1052,6 +1086,7 @@ const actions = {
       const bytes = await generatePDF(dv, state.profil, computeTotals(dv), fmt);
       const name = `Devis ${dv.numero}${dv.client.nom ? ' - ' + dv.client.nom : ''}.pdf`.replace(/[\\/:*?"<>|]/g, '');
       const ok = await saveFile(name, bytes, 'application/pdf');
+      if (ok) quoteEvent('pdf', dv, crypto.randomUUID());
       if (ok && dv.statut === 'brouillon') toast('PDF prêt. Une fois envoyé au client, cliquez sur « Marquer comme envoyé ».', 'ok', 6000);
     } catch (e) { console.error(e); toast('Le PDF n\'a pas pu être créé.', 'err'); }
   }),
@@ -1071,7 +1106,7 @@ const actions = {
     const d = createDevis();
     Object.assign(d, JSON.parse(JSON.stringify({ client: src.client, chantier: src.chantier, description: src.description, intro: src.intro, notes: src.notes, remisePct: src.remisePct, acomptePct: src.acomptePct })));
     d.lignes = src.lignes.map(l => ({ ...l, id: uid() }));
-    touch(d); go('editeur', d.id); toast(`Copie créée : ${d.numero}`);
+    d.dxTest ||= src.dxTest; touch(d); quoteEvent('devis', d); go('editeur', d.id); toast(`Copie créée : ${d.numero}`);
   },
   'delete-devis': async () => {
     const dv = getDevis(currentId);
@@ -1093,14 +1128,16 @@ const actions = {
     const d = getDevis(el.dataset.id); const ta = $('#rt-' + d.id);
     try {
       const txt = await askAI('relance', {
-        niveau: el.dataset.niveau, canal: ta.dataset.kind, artisan: state.profil.nom, tel: state.profil.tel, client: '',
-        numero: d.numero, dateEnvoi: fmtDate(d.dateEnvoi), objet: d.chantier.objet, montant: fmtMoney(computeTotals(d).ttc), validite: fmtDate(validiteDate(d)),
-      });
-      ta.value = personnaliser(txt.trim(), d.client.nom); updateRelanceLinks(d.id);
+        niveau: el.dataset.niveau, canal: ta.dataset.kind, artisan: '[artisan]', tel: '', client: '',
+        numero: '[numero]', dateEnvoi: '[date_envoi]', objet: '[objet]', montant: '[montant]', validite: '[validite]',
+      }, d);
+      const restored = txt.replace(/\[(artisan|numero|date_envoi|objet|montant|validite)\]/gi, (_, key) => '{' + key.toLowerCase() + '}');
+      ta.value = fillTemplate(personnaliser(restored.trim(), d.client.nom), d); updateRelanceLinks(d.id);
     } catch (e) { toast(e.message || 'IA indisponible.', 'warn', 6000); }
   }),
   'relance-done': el => {
     const d = getDevis(el.dataset.id); const ta = $('#rt-' + d.id);
+    quoteEvent('relance', d, d.id + '-' + d.dateEnvoi + '-' + d.relances.length);
     d.relances.push({ date: isoLocal(), canal: ta?.dataset.kind || 'email' }); touch(d); render();
     const r = relanceInfo(d);
     toast(r?.niveau ? `Relance notée. Prochaine relance le ${fmtDate(r.due)}.` : 'Relance notée. C\'était la dernière prévue.');
@@ -1166,7 +1203,8 @@ const actions = {
     if (ok) toast('Sauvegarde exportée');
   },
   'reset-all': async () => {
-    if (!(await confirmBox('Effacer TOUTES vos données (profil, devis, bibliothèque) sur cet appareil ? Exportez une sauvegarde avant si besoin.', 'Tout effacer', true))) return;
+    const scope = cloudMode ? 'de votre compte et de la sauvegarde en ligne' : 'de ce navigateur';
+    if (!(await confirmBox(`Effacer toutes les données ${scope} ? Exportez une sauvegarde avant si besoin.`, 'Tout effacer', true))) return;
     state = defaultState(); save(); go('tableau'); toast('Données effacées');
   },
 };
@@ -1182,12 +1220,19 @@ function updateRelanceLinks(id) {
    Événements
    ========================================================= */
 function onClick(ev) {
+  if (account?.switchInProgress() && ev.target.closest('#view')) return;
   const el = ev.target.closest('[data-action]');
   if (!el || el.tagName === 'SELECT' || el.tagName === 'INPUT') return;
   const fn = actions[el.dataset.action];
   if (fn) { ev.preventDefault(); fn(el, ev); }
 }
 function onInput(ev) {
+  if (ev.target.matches('[data-professional]')) {
+    const quote = getDevis(currentId);
+    if (!quote || !ev.target.checked) return;
+    quote.dxProfessional = true; touch(quote); quoteEvent('devis_professionnel', quote);
+    return;
+  }
   const el = ev.target;
   if (el.matches('textarea')) { if (el.closest('#lines')) autosize(el); }
   if (el.id === 'modele-nom') { window.__lastModeleNom = el.value; return; }
@@ -1248,25 +1293,31 @@ function onChange(ev) {
 }
 function handleLogo(input) {
   const file = input.files && input.files[0]; if (!file) return;
+  const profile = state.profil;
   const img = new Image();
   const url = URL.createObjectURL(file);
   img.onload = () => {
+    URL.revokeObjectURL(url);
+    if (profile !== state.profil) { toast('Le profil a changé. Sélectionnez de nouveau le logo.', 'warn'); return; }
     const max = 480; const sc = Math.min(max / img.width, max / img.height, 1);
     const cv = document.createElement('canvas'); cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc);
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-    state.profil.logo = cv.toDataURL('image/png'); URL.revokeObjectURL(url); save(); render(); toast('Logo ajouté');
+    state.profil.logo = cv.toDataURL('image/png'); save(); render(); toast('Logo ajouté');
   };
-  img.onerror = () => toast('Image illisible. Utilisez un PNG ou un JPG.', 'err');
+  img.onerror = () => { URL.revokeObjectURL(url); toast('Image illisible. Utilisez un PNG ou un JPG.', 'err'); };
   img.src = url;
 }
 function handleImport(input) {
   const file = input.files && input.files[0]; if (!file) return;
+  const workspace = state;
   const reader = new FileReader();
   reader.onload = async () => {
     try {
       const data = JSON.parse(reader.result);
       if (!data || !data.profil || !Array.isArray(data.devis)) throw new Error('format');
-      if (!(await confirmBox(`Remplacer les données actuelles par cette sauvegarde (${data.devis.length} devis) ?`, 'Importer'))) return;
+      if (workspace !== state) { toast('L’espace de travail a changé. Relancez l’import.', 'warn'); return; }
+      const scope = cloudMode ? 'du compte et de sa sauvegarde en ligne' : 'de ce navigateur';
+      if (!(await confirmBox(`Remplacer les données ${scope} par cette sauvegarde (${data.devis.length} devis) ?`, 'Importer'))) return;
       state = migrate(data); save(); render(); toast('Sauvegarde importée');
     } catch (e) { toast('Fichier de sauvegarde invalide.', 'err'); }
   };
@@ -1284,6 +1335,13 @@ window.addEventListener('hashchange', render);
 
 setAI(false);
 render();
+account = setupAccount({
+  read: () => state, empty: defaultState, guest: load,
+  install: (next, cloud) => { state = migrate(structuredClone(next)); cloudMode = cloud; render(); },
+  safe: () => !busy && !dict.active && $('#modal').hidden && !$('#view').contains(document.activeElement?.matches?.('input, textarea, select') ? document.activeElement : null),
+  exportState: next => saveFile(`devisexpress-sauvegarde-${isoLocal()}.json`, new TextEncoder().encode(JSON.stringify(next, null, 1)), 'application/json'),
+});
+setupPrivacy({ app: true, demo: demoState });
 detectAI();
 if (!storageOk) setTimeout(() => toast("Ce navigateur n'enregistre pas les données : exportez une sauvegarde avant de fermer.", 'warn', 7000), 800);
 
