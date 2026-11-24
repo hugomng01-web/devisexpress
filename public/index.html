@@ -111,6 +111,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   header .logo { font-size:1rem; gap:5px; }
   .review-form { padding:12px; }
 }
+.demo-direct { display:inline-block; padding:10px 0; color:#dbeafe; }
 </style>
 </head>
 <body>
@@ -128,7 +129,8 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   </div>
   <figure id="demo" class="demo-player">
     <figcaption>Voir la démonstration</figcaption>
-    <video controls playsinline preload="none" poster="/assets/demo-poster.webp" src="/demo.mp4" aria-label="Démonstration de DevisExpress, avec sous-titres intégrés"></video>
+    <video controls playsinline preload="metadata" poster="/assets/demo-poster.webp" src="/demo.mp4" aria-label="Démonstration de DevisExpress, avec sous-titres intégrés"></video>
+    <a class="demo-direct" href="/demo.mp4">Ouvrir la vidéo directement</a>
   </figure>
 </div></section>
 
