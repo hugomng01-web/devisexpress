@@ -90,6 +90,12 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   section { padding:64px 0; }
   footer a { margin:0 14px 0 0; }
 }
+.demo-player { margin:0; min-width:0; }
+.demo-player figcaption { margin-bottom:10px; font-weight:700; }
+.demo-player video { display:block; width:100%; aspect-ratio:16/9; border-radius:14px; background:#10192c; }
+.demo-direct { display:inline-block; padding:10px 0; color:#dbeafe; }
+@media(max-width:900px){ .hero .wrap { grid-template-columns:minmax(0,1fr); gap:24px; } }
+@media(max-width:600px){ .top .wrap { padding-inline:12px; gap:8px; } .top .logo { font-size:1rem; gap:5px; } .top nav .btn { padding:9px 8px; font-size:.76rem; white-space:nowrap; } .hero { padding:34px 0 40px; } .hero h1{font-size:clamp(28px,8vw,36px);margin-bottom:12px;} .hero p.lead {font-size:16px;margin-bottom:16px;} }
 </style>
 </head>
 <body>
@@ -100,23 +106,15 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
 
 <section class="hero"><div class="wrap">
   <div>
-    <span class="pill">Pour les artisans qui préfèrent le chantier à la paperasse</span>
     <h1>Votre devis pro en <em>2 minutes</em>. Suivez vos relances.</h1>
     <p class="lead">Dictez votre chantier depuis le camion. DevisExpress rédige un devis clair et soigné en PDF, avec vos prix, puis vous dit quand et comment relancer le client.</p>
     <div class="ctas"><a class="btn btn-primary" href="app/">Commencer gratuitement</a><a class="btn btn-ghost" href="#comment">Voir comment ça marche</a></div>
     <small>Gratuit pendant le lancement · Sans carte bancaire · Sans engagement · Sans compte obligatoire</small>
   </div>
-  <div class="mock" aria-hidden="true">
-    <div class="bubble b1"><i>🎙️</i>« Remplacement chauffe-eau 200 L, dépose de l'ancien, 3 h de main-d'œuvre »</div>
-    <div class="mock-paper">
-      <div class="h"><div><b>Dupont Plomberie</b><br><span style="color:#64748b;font-size:10px;font-weight:400">14 rue Paul Bert, 69003 Lyon</span></div><span>DEVIS</span></div>
-      <div class="obj">Objet : Remplacement du chauffe-eau</div>
-      <table><thead><tr><th>Désignation</th><th>Qté</th><th>Total HT</th></tr></thead>
-      <tbody><tr><td>Chauffe-eau électrique 200 L</td><td>1 u</td><td>520,00 €</td></tr><tr><td>Dépose et évacuation de l'ancien</td><td>1 forfait</td><td>90,00 €</td></tr><tr><td>Groupe de sécurité</td><td>1 u</td><td>45,00 €</td></tr><tr><td>Main-d'œuvre plombier</td><td>3 h</td><td>165,00 €</td></tr></tbody></table>
-      <div class="tot"><div><span>Total HT</span><span>820,00 €</span></div><div><span>TVA 10 %</span><span>82,00 €</span></div><div class="ttc"><span>Total TTC</span><span>902,00 €</span></div></div>
-    </div>
-    <div class="bubble b2"><i>🔔</i>Relance prévue pour M. Martin aujourd'hui — message prêt</div>
-  </div>
+  <figure id="demo" class="demo-player"><figcaption>Voir la démonstration</figcaption>
+    <video controls playsinline preload="metadata" poster="/assets/demo-poster.webp" src="/demo.mp4" aria-label="Démonstration de DevisExpress"></video>
+    <a class="demo-direct" href="/demo.mp4">Ouvrir la vidéo directement</a>
+  </figure>
 </div></section>
 
 <section class="pains"><div class="wrap">
@@ -155,7 +153,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   </div>
 </div></section>
 
-<section id="demo"><div class="wrap center"><h2>Voir DevisExpress en action</h2><video controls playsinline preload="none" style="width:100%;max-width:820px;border-radius:16px" src="/demo.mp4"></video></div></section>
+
 
 <section class="faq" id="faq"><div class="wrap">
   <div class="kicker center">Questions fréquentes</div>
