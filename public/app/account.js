@@ -10,7 +10,7 @@ export function setupAccount({ read, install, empty, guest, safe, exportState })
   const status = document.querySelector('#account-status');
   const accountButton = document.querySelector('#account-button');
   const google = document.querySelector('#account-google');
-  let user, saved, revision = 0, conflicts = [], timer, inFlight, switching = false, enabled = false;
+  let user, saved, revision = 0, conflicts = [], timer, inFlight, switching = false, enabled = false, emailEnabled = false;
   let mode = 'login';
   const key = () => 'dx_draft_' + user.id;
   const tell = text => { status.textContent = text; };
@@ -42,10 +42,10 @@ export function setupAccount({ read, install, empty, guest, safe, exportState })
     accountButton.textContent = user ? 'Mon compte' : 'Sauvegarde en ligne';
     buttons.replaceChildren();
     google.hidden = Boolean(user) || !google.hasAttribute('href');
-    form.hidden = Boolean(user) || !enabled;
+    form.hidden = Boolean(user) || !emailEnabled;
     if (!user) {
-      info.textContent = enabled ? 'Créez un compte gratuit pour retrouver vos devis et votre fiche entreprise sur tous vos appareils.' : 'Sauvegarde en ligne indisponible. Vous pouvez continuer à utiliser l’application sur cet appareil.';
-      if (!enabled) return;
+      info.textContent = enabled && (emailEnabled || !google.hidden) ? 'Créez un compte gratuit pour retrouver vos devis et votre fiche entreprise sur tous vos appareils.' : 'Sauvegarde en ligne indisponible. Vous pouvez continuer à utiliser l’application sur cet appareil.';
+      if (!emailEnabled) return;
       makeButton('Connexion', () => setMode('login'));
       makeButton('Créer mon compte gratuit', () => setMode('signup'));
       makeButton('Mot de passe oublié', () => setMode('recover'));
@@ -242,13 +242,14 @@ export function setupAccount({ read, install, empty, guest, safe, exportState })
   if (query.has('compte')) accountButton.click();
   api('config').then(async options => {
     enabled = options.enabled;
+    emailEnabled = enabled && options.email === true;
     if (options.google) google.href = '/api/v2/google';
     render();
     if (!enabled) return;
     const session = await api('session');
     if (session.user) await attach(session.user);
-    if (session.user && query.get('compte') === 'reinitialiser') setMode('password');
-    else if (!session.user && query.get('compte') === 'creer') setMode('signup');
+    if (emailEnabled && session.user && query.get('compte') === 'reinitialiser') setMode('password');
+    else if (emailEnabled && !session.user && query.get('compte') === 'creer') setMode('signup');
     if (query.has('compte')) history.replaceState(null, '', location.pathname + location.hash);
   }).catch(() => tell('Impossible de joindre la sauvegarde en ligne. Vos données locales restent accessibles.'));
   setInterval(() => { if (document.visibilityState === 'visible') reconcile(); }, 45000);

@@ -31,6 +31,15 @@ function client() {
 const sample = { profil: { nom: 'Fiche fictive', prochainNumero: 1 }, devis: [], prestations: [], modeles: [] };
 try {
   assert.equal((await guest('config')).data.enabled, true);
+  delete process.env.DX_EMAIL_ENABLED;
+  process.env.DX_GOOGLE_ENABLED = 'true';
+  assert.deepEqual((await guest('config')).data, { enabled: true, google: true, email: false });
+  for (const path of ['signup', 'login', 'recover', 'confirm-email', 'password']) {
+    assert.equal((await guest(path, {})).status, 404);
+  }
+  assert.equal((await guest('google')).status, 302);
+  delete process.env.DX_GOOGLE_ENABLED;
+  process.env.DX_EMAIL_ENABLED = 'true';
   assert.equal((await guest('admin/stats')).status, 401);
   assert.equal((await guest('workspace')).status, 401);
   for (const [agent, email] of [[alice, 'alice@example.invalid'], [bob, 'bob@example.invalid']]) {

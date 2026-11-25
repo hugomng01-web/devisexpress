@@ -7,6 +7,7 @@ import v2 from '../netlify/functions/v2.mjs';
 import ai from '../netlify/functions/ai.mjs';
 
 export async function startTestServer() {
+  process.env.DX_EMAIL_ENABLED = 'true';
   process.env.SUPABASE_URL = 'https://supabase.invalid';
   process.env.SUPABASE_PUBLISHABLE_KEY = 'test-public';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service';

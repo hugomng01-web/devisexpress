@@ -6,6 +6,8 @@ const profiles = ['professionnel', 'beta', 'non_renseigne'];
 const events = ['visite', 'activite', 'devis', 'devis_professionnel', 'pdf', 'relance', 'ia'];
 const setting = key => process.env[key] || '';
 const ready = () => Boolean(setting('SUPABASE_URL') && setting('SUPABASE_PUBLISHABLE_KEY') && setting('SUPABASE_SERVICE_ROLE_KEY') && setting('DX_HASH_SECRET').length >= 32);
+const emailEnabled = () => setting('DX_EMAIL_ENABLED') === 'true';
+const googleEnabled = () => setting('DX_GOOGLE_ENABLED') === 'true';
 const hash = value => createHmac('sha256', setting('DX_HASH_SECRET')).update(value).digest('hex');
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const originOf = req => setting('ALLOWED_ORIGIN') || new URL(req.url).origin;
@@ -115,10 +117,13 @@ export default async function handler(req, context) {
   let current = {};
   const send = (data, status) => output(data, current.session, req, status);
   const method = req.method;
-  if (method === 'GET' && path === 'config') return send({ enabled: ready(), google: ready() && setting('DX_GOOGLE_ENABLED') === 'true' });
+  if (method === 'GET' && path === 'config') return send({ enabled: ready(), google: ready() && googleEnabled(), email: ready() && emailEnabled() });
   if (!ready()) return send({ error: 'Le service en ligne est indisponible. Vos données locales restent accessibles.' }, 503);
   if (method !== 'GET' && (req.headers.get('origin') !== originOf(req) || method !== 'POST')) return send({ error: 'Requête non autorisée.' }, 403);
   try {
+    if (method === 'POST' && ['signup', 'login', 'recover', 'confirm-email', 'password'].includes(path) && !emailEnabled()) {
+      return send({ error: 'La connexion par mot de passe est désactivée.' }, 404);
+    }
     if (method === 'POST' && ['signup', 'login', 'recover'].includes(path)) {
       const input = await body(req);
       const data = credentials(input, path === 'signup' ? 10 : path === 'login' ? 1 : 0);
@@ -137,7 +142,7 @@ export default async function handler(req, context) {
       }
       return send({ ok: true });
     }
-    if (method === 'GET' && path === 'google' && setting('DX_GOOGLE_ENABLED') === 'true') {
+    if (method === 'GET' && path === 'google' && googleEnabled()) {
       const verifier = randomBytes(32).toString('base64url');
       const challenge = createHash('sha256').update(verifier).digest('base64url');
       const query = new URLSearchParams({ provider: 'google', redirect_to: originOf(req) + '/api/v2/callback', code_challenge: challenge, code_challenge_method: 's256' });
@@ -155,13 +160,13 @@ export default async function handler(req, context) {
       const token = url.searchParams.get('token_hash');
       const code = url.searchParams.get('code');
       const verifier = cookies(req).dx_pkce;
-      if (validId(token) && ['email', 'signup', 'recovery'].includes(type)) {
+      if (emailEnabled() && validId(token) && ['email', 'signup', 'recovery'].includes(type)) {
         const fragment = new URLSearchParams({ token, type });
         return new Response(null, { status: 303, headers: {
           Location: '/app/confirmation.html#' + fragment, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
         } });
       }
-      if (!code || !verifier) throw fail(400, 'Lien invalide ou expiré.');
+      if (!googleEnabled() || !code || !verifier) throw fail(400, 'Lien invalide ou expiré.');
       current.session = await auth('/token?grant_type=pkce', { method: 'POST', data: { auth_code: code, code_verifier: verifier } });
       const headers = output({}, current.session, req).headers;
       headers.append('Set-Cookie', cookie('pkce', '', 0, req));
