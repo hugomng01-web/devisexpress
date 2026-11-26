@@ -239,11 +239,14 @@ export function setupAccount({ read, install, empty, guest, safe, exportState })
   setMode('login');
   render();
   const query = new URLSearchParams(location.search);
-  if (query.has('compte')) accountButton.click();
   api('config').then(async options => {
     enabled = options.enabled;
     emailEnabled = enabled && options.email === true;
     if (options.google) google.href = '/api/v2/google';
+    const canSignIn = emailEnabled || options.google === true;
+    accountButton.hidden = !canSignIn;
+    document.querySelector('#usage-preferences').hidden = !enabled;
+    if (canSignIn && query.has('compte')) accountButton.click();
     render();
     if (!enabled) return;
     const session = await api('session');

@@ -1,7 +1,6 @@
 import { api } from './api.js';
 import { setupPrivacy } from './telemetry.js';
 
-setupPrivacy();
 const list = document.querySelector('#review-list');
 const empty = document.querySelector('#review-empty');
 const node = (tag, text, className) => {
@@ -56,4 +55,12 @@ document.querySelector('#review-withdraw').addEventListener('submit', async even
   } catch (error) { output.textContent = error.message; }
   finally { button.disabled = false; }
 });
-refreshReviews();
+api('config').then(config => {
+  if (!config.enabled) return;
+  document.querySelectorAll('[data-online]').forEach(element => { element.hidden = false; });
+  if (config.google || config.email) {
+    document.querySelectorAll('[data-account-entry]').forEach(element => { element.hidden = false; });
+  }
+  setupPrivacy();
+  return refreshReviews();
+}).catch(() => {});

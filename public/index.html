@@ -111,20 +111,21 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   header .logo { font-size:1rem; gap:5px; }
   .review-form { padding:12px; }
 }
-.demo-direct { display:inline-block; padding:10px 0; color:#dbeafe; }
+[hidden] { display:none !important; }
+.demo-direct { display:inline-block; padding:6px 0; color:#dbeafe; }
 </style>
 </head>
 <body>
 <header class="top"><div class="wrap">
   <a class="logo" href="#"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#1d4ed8"/><path d="M9 8h8l6 6v10H9z" fill="#fff"/><path d="M17 8v6h6" fill="#f59e0b"/></svg>Devis<b>Express</b></a>
-  <nav><a href="#comment">Comment ça marche</a><a href="#avis">Avis</a><a href="#faq">Questions</a><a class="btn btn-primary" href="app/">Commencer gratuitement</a></nav>
+  <nav><a href="#comment">Comment ça marche</a><a href="#avis" data-online hidden>Avis</a><a href="#faq">Questions</a><a class="btn btn-primary" href="app/">Commencer gratuitement</a></nav>
 </div></header>
 
 <section class="hero"><div class="wrap">
   <div>
     <h1>Votre devis pro en <em>2 minutes</em>. Vos relances au bon moment.</h1>
     <p class="lead">Dictez votre chantier, préparez le devis PDF avec vos prix et retrouvez les clients à relancer.</p>
-    <div class="ctas"><a class="btn btn-primary" href="app/">Commencer gratuitement</a><a class="btn btn-ghost" href="app/?compte=creer">Créer mon compte gratuit</a></div>
+    <div class="ctas"><a class="btn btn-primary" href="app/">Commencer gratuitement</a><a class="btn btn-ghost" href="app/?compte=creer" data-account-entry hidden>Créer mon compte gratuit</a></div>
     <small>Gratuit pendant le lancement · Sans carte bancaire, engagement ni compte obligatoire</small>
   </div>
   <figure id="demo" class="demo-player">
@@ -177,7 +178,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   <details><summary>Les mentions obligatoires sont-elles sur le devis ?</summary><p>Le devis intègre les mentions courantes : identité et SIRET, date et durée de validité, détail des prestations, HT/TVA/TTC, conditions de paiement, assurance professionnelle, médiateur et zone de signature. Les obligations varient selon votre statut et votre métier : faites valider votre modèle une fois par votre comptable.</p></details>
   <details><summary>Je suis en micro-entreprise, sans TVA. Ça marche ?</summary><p>Oui : choisissez « Franchise en base » dans votre profil. La TVA disparaît et la mention « TVA non applicable, art. 293 B du CGI » est ajoutée automatiquement.</p></details>
   <details><summary>Faut-il installer quelque chose ?</summary><p>Non, tout se passe dans le navigateur, sur téléphone comme sur ordinateur.</p></details>
-  <details><summary>Où sont stockées mes données ?</summary><p>Sans compte, vos devis restent sur cet appareil. Un compte gratuit vous permet de les sauvegarder et de les retrouver sur vos autres appareils. Vous pouvez toujours exporter une sauvegarde depuis votre profil.</p></details>
+  <details><summary>Où sont stockées mes données ?</summary><p>Sans compte, vos devis restent sur cet appareil.<span data-account-entry hidden> Un compte gratuit vous permet de les sauvegarder et de les retrouver sur vos autres appareils.</span> Vous pouvez toujours exporter une sauvegarde depuis votre profil.</p></details>
 </div></section>
 
 <section class="final"><div class="wrap">
@@ -186,7 +187,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
   <a class="btn btn-primary" href="app/">Commencer gratuitement</a>
 </div></section>
 
-<section class="reviews" id="avis"><div class="wrap">
+<section class="reviews" id="avis" data-online hidden><div class="wrap">
   <h2>Ils ont testé DevisExpress</h2>
   <p class="sub">Les avis sont modérés avant publication et affichés du plus récent au plus ancien.</p>
   <p id="review-empty" class="sub" aria-live="polite">Partagez votre expérience avec les prochains utilisateurs.</p>
@@ -222,7 +223,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:20px; flex-wrap:
 </div></section>
 <footer><div class="wrap">
   <span>© DevisExpress</span>
-  <span><a href="mentions-legales.html">Mentions légales</a><a href="cgu.html">CGU</a><a href="confidentialite.html">Confidentialité</a><details id="usage-preferences"><summary>Préférences de mesure</summary>
+  <span><a href="mentions-legales.html">Mentions légales</a><a href="cgu.html">CGU</a><a href="confidentialite.html">Confidentialité</a><details id="usage-preferences" data-online hidden><summary>Préférences de mesure</summary>
   <form>
     <label class="check"><input type="checkbox" name="consent"> Participer à la mesure d’usage facultative</label>
     <label hidden><input type="checkbox" name="test"> Mode test</label>
