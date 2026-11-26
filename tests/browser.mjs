@@ -1,0 +1,216 @@
+import assert from 'node:assert/strict';
+import { mkdir, readFile } from 'node:fs/promises';
+import { startTestServer } from './server.mjs';
+const { chromium } = await import(process.env.DX_PLAYWRIGHT_MODULE || 'playwright');
+
+const server = await startTestServer();
+const browser = await chromium.launch({ executablePath: process.env.DX_CHROMIUM || '/usr/bin/chromium', args: ['--no-sandbox'] });
+const origin = server.base;
+const password = 'Fiction-Long-Password';
+const invite = '/app/?compte=creer';
+const status = page => page.locator('#account-status');
+const form = page => page.locator('#account-form');
+const exact = (page, label) => page.getByRole('button', { name: label, exact: true });
+const errors = [];
+const pages = [];
+async function page(options = {}) {
+  const context = await browser.newContext(options);
+  await context.route(/fonts\.googleapis\.com|fonts\.gstatic\.com/, route => route.abort());
+  const tab = await context.newPage();
+  tab.on('pageerror', error => errors.push(error.message));
+  tab.setDefaultTimeout(10000);
+  pages.push(tab);
+  return tab;
+}
+async function waitText(locator, pattern) {
+  await locator.filter({ hasText: pattern }).waitFor({ timeout: 9000 });
+}
+async function credentials(tab, email, secret = password) {
+  await form(tab).locator('[name=email]').fill(email);
+  await form(tab).locator('[name=password]').fill(secret);
+  await form(tab).locator('button').click();
+}
+async function sync(tab) { await exact(tab, 'Synchroniser maintenant').click(); }
+const artifact = process.env.DX_PREVIEW_DIR;
+if (artifact) await mkdir(artifact, { recursive: true });
+try {
+  const guest = await page({ acceptDownloads: true, viewport: { width: 1440, height: 960 } });
+  await guest.goto(origin, { waitUntil: 'domcontentloaded' });
+  assert.match(await guest.title(), /DevisExpress/);
+  assert.equal(await guest.getByText(/14 jours|19 €|39 €/).count(), 0);
+  assert.equal(await guest.locator('video').getAttribute('src'), '/demo.mp4');
+  assert.equal((await guest.request.get(origin + '/vision.html')).status(), 404);
+  assert.equal((await guest.request.get(origin + '/api/v2/admin/stats')).status(), 401);
+  if (artifact) await guest.screenshot({ path: artifact + '/DevisExpress-Accueil.png', fullPage: true, animations: 'disabled' });
+  const mobile = await page({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
+  await mobile.goto(origin, { waitUntil: 'domcontentloaded' });
+  assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  assert.equal(await mobile.locator('#demo video').count(), 1);
+  await mobile.waitForFunction(() => document.querySelector('#demo video').getBoundingClientRect().bottom <= innerHeight);
+  await mobile.setViewportSize({ width: 320, height: 700 });
+  assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await mobile.setViewportSize({ width: 390, height: 844 });
+  if (artifact) await mobile.screenshot({ path: artifact + '/DevisExpress-Accueil-mobile.png', animations: 'disabled' });
+  await guest.getByRole('link', { name: 'Commencer gratuitement', exact: true }).first().click();
+  await guest.waitForURL('**/app/');
+  await guest.locator('[data-action=new-devis]').first().click();
+  const quotation = () => guest.evaluate(() => window.__devisexpress.state.devis[0]);
+  const firstId = (await quotation()).id;
+  await guest.locator('[data-bind="client.nom"]').fill('Client Fictif');
+  await guest.locator('[data-bind="client.email"]').fill('fictif@example.invalid');
+  await guest.locator('#ai-desc').fill('Pose chauffe-eau pour Client Fictif au 8 rue du Test, fictif@example.invalid, 0612345678');
+  await guest.locator('body.ai-on').waitFor();
+  await guest.locator('[data-action=ai-lines]').click();
+  await guest.waitForFunction(() => window.__devisexpress.state.devis[0].lignes.some(line => line.designation === 'Pose chauffe-eau'));
+  assert.equal(server.prompt.includes('Client Fictif'), false);
+  assert.equal(server.prompt.includes('fictif@example.invalid'), false);
+  assert.equal(server.prompt.includes('rue du Test'), false);
+  assert.equal(server.prompt.includes('0612345678'), false);
+  const pdf = guest.waitForEvent('download');
+  await guest.locator('[data-action=pdf]').first().click();
+  await guest.locator('#modal [data-close="ok"]').click();
+  await exact(guest, 'Oui, télécharger').click();
+  const bytes = await readFile(await (await pdf).path());
+  assert.equal(bytes.subarray(0, 4).toString(), '%PDF');
+  await guest.locator('[data-action=mark-sent]').click();
+  await guest.locator('nav [data-view=relances]').click();
+  await guest.locator('[data-action=relance-done]').first().click();
+  assert.equal((await quotation()).relances.length, 1);
+  await guest.locator('nav [data-view=profil]').click();
+  await guest.locator('input[data-bind="profil.nom"],input[data-pbind="nom"],input[data-prof="nom"],input[data-p="nom"]').first().fill('Atelier fictif');
+  await guest.goto(origin + invite);
+  await waitText(form(guest), 'Créer mon compte');
+  await credentials(guest, 'artisan@example.invalid');
+  await waitText(status(guest), 'confirmer');
+  const confirmation = server.codes.get('artisan@example.invalid');
+  await guest.goto(origin + '/app/confirmation.html#type=signup&token=' + confirmation);
+  await exact(guest, 'Confirmer mon adresse').click();
+  await waitText(guest.locator('#account-info'), 'artisan@example.invalid');
+  await exact(guest, 'Transférer mes données locales').waitFor();
+  guest.once('dialog', dialog => dialog.accept());
+  await exact(guest, 'Transférer mes données locales').click();
+  await waitText(status(guest), 'à jour');
+  assert.equal((await quotation()).id, firstId);
+  assert.equal(server.workspace.size, 1);
+  assert.equal([...server.workspace.values()][0].state.devis.length, 1);
+
+  const other = await page({ viewport: { width: 390, height: 844 } });
+  await other.goto(origin + '/app/?compte=connexion');
+  await credentials(other, 'artisan@example.invalid');
+  await waitText(status(other), 'à jour');
+  assert.equal(await other.evaluate(() => window.__devisexpress.state.profil.nom), 'Atelier fictif');
+  assert.equal(await other.evaluate(() => window.__devisexpress.state.devis[0].id), firstId);
+  assert.equal((await other.request.get(origin + '/api/v2/admin/stats')).status(), 403);
+  assert.equal(await other.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  await other.locator('nav [data-view=profil]').click();
+  const target = other.locator('input[data-bind="profil.nom"],input[data-pbind="nom"],input[data-prof="nom"],input[data-p="nom"]').first();
+  await target.fill('Atelier synchronisé');
+  await sync(other);
+  await other.waitForFunction(() => document.querySelector('#account-status').textContent.includes('à jour'));
+  await sync(guest);
+  await guest.waitForFunction(() => window.__devisexpress.state.profil.nom === 'Atelier synchronisé');
+
+  const locateCompany = tab => tab.locator('input[data-bind="profil.nom"],input[data-pbind="nom"],input[data-prof="nom"],input[data-p="nom"]').first();
+  await guest.locator('nav [data-view=profil]').click();
+  await locateCompany(guest).fill('Modification concurrente A');
+  await target.fill('Modification concurrente B');
+  await sync(other);
+  await other.waitForFunction(() => document.querySelector('#account-status').textContent.includes('à jour'));
+  await sync(guest);
+  await waitText(status(guest), 'Modifications concurrentes');
+  assert.equal(await guest.evaluate(() => window.__devisexpress.state.profil.nom), 'Modification concurrente A');
+  assert.equal([...server.workspace.values()][0].state.profil.nom, 'Modification concurrente B');
+  guest.once('dialog', dialog => dialog.accept());
+  const exportedConflict = guest.waitForEvent('download');
+  await exact(guest, 'Reprendre la version en ligne').click();
+  await exportedConflict;
+  await guest.waitForFunction(() => window.__devisexpress.state.profil.nom === 'Modification concurrente B');
+
+  await exact(guest, 'Se déconnecter').click();
+  await waitText(status(guest), 'Déconnecté');
+  assert.equal(await guest.evaluate(() => window.__devisexpress.state.profil.nom), 'Atelier fictif');
+  await exact(guest, 'Mot de passe oublié').click();
+  await form(guest).locator('[name=email]').fill('artisan@example.invalid');
+  await form(guest).locator('button').click();
+  await waitText(status(guest), 'réinitialisation');
+  await guest.goto(origin + '/app/confirmation.html#type=recovery&token=' + server.codes.get('artisan@example.invalid'));
+  await exact(guest, 'Continuer la réinitialisation').click();
+  await waitText(form(guest), 'Enregistrer le mot de passe');
+  await form(guest).locator('[name=password]').fill('Fiction-Nouveau-Mot-De-Passe');
+  await form(guest).locator('button').click();
+  await waitText(status(guest), 'Mot de passe enregistré');
+  await exact(guest, 'Se déconnecter').click();
+  await waitText(status(guest), 'Déconnecté');
+  await credentials(guest, 'artisan@example.invalid', 'Fiction-Nouveau-Mot-De-Passe');
+  await waitText(status(guest), 'à jour');
+
+  const visitor = await page();
+  await visitor.goto(origin + '/app/');
+  await visitor.locator('#usage-preferences summary').click();
+  await visitor.locator('[name=consent]').check();
+  await visitor.locator('#usage-preferences form button').first().click();
+  await visitor.locator('[data-action=new-devis]').first().click();
+  await visitor.waitForTimeout(300);
+  assert.equal([...server.events.values()].filter(event => event.kind === 'devis').length, 1);
+  await visitor.locator('[data-bind="client.nom"]').fill('Donnée fictive modifiée');
+  await visitor.locator('[name=test]').check();
+  await visitor.locator('#usage-preferences form button').first().click();
+  await visitor.locator('nav [data-view=tableau]').click();
+  await visitor.locator('[data-action=new-devis]').first().click();
+  await visitor.waitForTimeout(300);
+  assert.equal([...server.events.values()].filter(event => event.kind === 'devis').length, 1);
+  assert.equal(JSON.stringify([...server.events.values()]).includes('Donnée fictive'), false);
+
+  await visitor.goto(origin + '/#avis');
+  await visitor.getByText('Laisser un avis', { exact: true }).click();
+  const review = visitor.locator('#review-form');
+  await review.locator('[name=rating][value="4"]').check();
+  await review.locator('[name=author]').fill('Compte fictif');
+  await review.locator('[name=trade]').fill('Test de l’interface');
+  await review.locator('[name=profile]').selectOption('beta');
+  await review.locator('[name=experienceDate]').fill('2025-01-01');
+  await review.locator('[name=comment]').fill('Avis fictif utilisé exclusivement dans le test local.');
+  await review.locator('[name=consent]').check();
+  await exact(visitor, 'Envoyer mon avis').click();
+  await waitText(visitor.locator('#review-result'), 'attente de modération');
+  const receipt = (await visitor.locator('#review-result span').textContent()).split(' : ')[1];
+  assert.equal((await (await visitor.request.get(origin + '/api/v2/reviews')).json()).reviews.length, 0);
+
+  const owner = await page({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  await owner.goto(origin + '/app/?compte=connexion');
+  await credentials(owner, 'admin@example.invalid', 'secret-admin-test');
+  await owner.getByRole('link', { name: 'DevisExpress Analytics' }).click();
+  await owner.locator('.metric').first().waitFor();
+  const csv = owner.waitForEvent('download');
+  await exact(owner, 'Exporter le CSV').click();
+  assert.match(await readFile(await (await csv).path(), 'utf8'), /Créations de devis observées/);
+  if (artifact) {
+    await owner.evaluate(() => { document.querySelector('#admin-status').textContent = 'Aperçu local · données de test fictives'; });
+    await owner.screenshot({ path: artifact + '/DevisExpress-Analytics.png', fullPage: true, animations: 'disabled' });
+  }
+  await exact(owner, 'Avis utilisateurs').click();
+  await owner.getByText('Compte fictif', { exact: false }).waitFor();
+  owner.once('dialog', dialog => dialog.accept());
+  await exact(owner, 'Publier').click();
+  await waitText(owner.locator('#review-queue'), 'Aucun avis');
+  await visitor.reload();
+  await visitor.getByText('Bêta-testeur déclaré', { exact: false }).waitFor();
+  await visitor.getByText('Retirer mon avis', { exact: true }).click();
+  await visitor.locator('[name=receipt]').fill(receipt);
+  await exact(visitor, 'Demander le retrait').click();
+  await waitText(visitor.locator('#withdraw-result'), 'Demande traitée');
+  assert.equal(server.reviews.length, 0);
+
+  guest.once('dialog', dialog => dialog.accept());
+  await exact(guest, 'Supprimer mon compte').click();
+  await waitText(status(guest), 'supprimés');
+  assert.equal(server.workspace.size, 0);
+  assert.deepEqual(errors, []);
+  const voice = await mobile.goto(origin + '/app/').then(() => mobile.evaluate(() => Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)));
+  console.log('Chromium : accueil responsive, devis invité, PDF, relance, IA simulée et confidentialité, comptes, récupération, transfert, synchronisation, conflit conservé, suppression, avis, modération, CSV, consentement et exclusions vérifiés.');
+  console.log('Dictée : API navigateur ' + (voice ? 'détectée' : 'indisponible') + ' ; aucune transcription réelle validée.');
+} finally {
+  for (const tab of pages) await tab.context().close();
+  await browser.close();
+  await server.close();
+}

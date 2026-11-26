@@ -7,9 +7,7 @@
 <meta name="description" content="Créez des devis professionnels en 2 minutes grâce à l'IA, et relancez vos clients sans y penser.">
 <meta name="theme-color" content="#1e40af">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231e40af'/%3E%3Cpath d='M9 8h8l6 6v10H9z' fill='%23fff'/%3E%3Cpath d='M17 8v6h6' fill='%23f59e0b'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/inter.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -53,9 +51,35 @@
       <a href="#prestations" data-view="prestations"><svg class="ic"><use href="#i-list"/></svg><span>Prestations</span></a>
       <a href="#profil" data-view="profil"><svg class="ic"><use href="#i-building"/></svg><span>Profil</span></a>
     </nav>
-    <p class="side-foot">Vos données restent sur cet appareil.</p>
+    <p class="side-foot">Sauvegarde locale ou compte facultatif.</p>
   </aside>
-  <main id="view" class="main"></main>
+  <div class="main">
+    <div class="account-bar">
+      <button class="btn" id="account-button" hidden aria-expanded="false" aria-controls="account-panel">Sauvegarde en ligne</button>
+      <details id="usage-preferences" hidden>
+        <summary>Confidentialité et mode test</summary>
+        <form>
+          <label><input type="checkbox" name="consent"> Participer à la mesure d’usage facultative</label>
+          <label><input type="checkbox" name="test"> Mode test. Exclure mes essais des statistiques</label>
+          <label>Profil déclaré <select name="profile"><option value="non_renseigne">Non renseigné</option><option value="professionnel">Artisan / professionnel</option><option value="beta">Bêta-testeur</option></select></label>
+          <div><button class="btn">Enregistrer</button> <button type="button" class="btn" data-erase-usage>Retirer et effacer mes mesures</button></div>
+          <output aria-live="polite"></output><a href="/confidentialite.html">Politique de confidentialité</a>
+        </form>
+      </details>
+    </div>
+    <section id="account-panel" class="account-panel" hidden>
+      <p id="account-info"></p>
+      <form id="account-form" hidden>
+        <input type="email" name="email" aria-label="Adresse email" placeholder="Adresse email" autocomplete="email">
+        <input type="password" name="password" aria-label="Mot de passe" placeholder="Mot de passe" maxlength="128">
+        <button class="btn primary">Se connecter</button>
+      </form>
+      <div id="account-actions"></div>
+      <a class="btn" id="account-google" hidden>Continuer avec Google</a>
+      <p id="account-status" aria-live="polite"></p>
+    </section>
+    <main id="view"></main>
+  </div>
 </div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 <div id="modal" class="modal" hidden></div>

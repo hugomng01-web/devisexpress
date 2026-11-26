@@ -7,7 +7,7 @@
 //   ANTHROPIC_API_KEY   votre clé Anthropic                          — ou —
 //   GEMINI_API_KEY      votre clé Google AI Studio (offre gratuite)  — ou —
 //   OPENAI_API_KEY      votre clé OpenAI, ou d'un service compatible (Groq…) avec OPENAI_BASE_URL
-//   AI_PROVIDER         optionnel : "anthropic", "gemini" ou "openai" (sinon déduit de la clé présente)
+//   AI_PROVIDER         explicite : "anthropic", "gemini" ou "openai"
 //   SANS AUCUNE CLÉ, l'application fonctionne en mode sans IA (modèles et textes automatiques).
 //   AI_MODEL            optionnel : nom du modèle à utiliser
 //   ALLOWED_ORIGIN      optionnel : votre domaine, ex. https://devisexpress.fr
@@ -15,7 +15,7 @@
 import { buildPrompt, TASKS } from '../../public/app/prompts.js';
 
 const MAX_BODY = 30_000;              // taille maximale d'une requête (caractères)
-const LIMIT_PER_HOUR = 60;            // demandes IA par adresse IP et par heure (limite simple)
+const LIMIT_PER_HOUR = 30;            // demandes IA par adresse IP et par heure (limite simple)
 const hits = new Map();               // compteur en mémoire (remis à zéro au redémarrage)
 
 const json = (status, obj, origin) => new Response(JSON.stringify(obj), {
@@ -30,6 +30,10 @@ const json = (status, obj, origin) => new Response(JSON.stringify(obj), {
 
 function rateLimited(ip) {
   const now = Date.now();
+  if (hits.size >= 5000) {
+    for (const [key, value] of hits) if (now - value.t > 3_600_000) hits.delete(key);
+    if (hits.size >= 5000 && !hits.has(ip)) return true;
+  }
   const rec = hits.get(ip) || { n: 0, t: now };
   if (now - rec.t > 3_600_000) { rec.n = 0; rec.t = now; }
   rec.n++;
@@ -61,9 +65,11 @@ async function callOpenAI(prompt) {
   const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
+    signal: AbortSignal.timeout(12000),
     headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: process.env.AI_MODEL || 'gpt-4o-mini',
+      max_completion_tokens: 2200,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -120,17 +126,13 @@ async function callGemini(prompt) {
 }
 
 function currentProvider() {
-  const p = (process.env.AI_PROVIDER || '').toLowerCase();
-  if (p) return p;
-  if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
-  if (process.env.GEMINI_API_KEY) return 'gemini';
-  if (process.env.OPENAI_API_KEY) return 'openai';
-  return 'anthropic';
+  return (process.env.AI_PROVIDER || '').toLowerCase();
 }
-function providerHasKey(p) {
-  if (p === 'openai') return !!process.env.OPENAI_API_KEY;
-  if (p === 'gemini') return !!process.env.GEMINI_API_KEY;
-  return !!process.env.ANTHROPIC_API_KEY;
+function providerHasKey(provider) {
+  if (provider === 'openai') return Boolean(process.env.OPENAI_API_KEY);
+  if (provider === 'gemini') return Boolean(process.env.GEMINI_API_KEY);
+  if (provider === 'anthropic') return Boolean(process.env.ANTHROPIC_API_KEY);
+  return false;
 }
 
 export default async (req, context) => {
@@ -144,7 +146,7 @@ export default async (req, context) => {
   // GET /api/ai : l'application demande simplement si l'IA est disponible
   if (req.method === 'GET') return json(200, { enabled: hasKey }, allowed);
   if (req.method !== 'POST') return json(405, { error: 'Méthode non autorisée.' });
-  if (allowed && origin && origin !== allowed) return json(403, { error: 'Origine non autorisée.' });
+  if ((origin && origin !== (allowed || new URL(req.url).origin)) || (allowed && !origin)) return json(403, { error: 'Origine non autorisée.' });
 
   if (!hasKey) return json(503, { error: "L'assistant IA n'est pas encore configuré : ajoutez la clé API dans les réglages Netlify (voir le guide)." }, allowed);
 
@@ -166,9 +168,9 @@ export default async (req, context) => {
     const text = provider === 'openai' ? await callOpenAI(prompt) : provider === 'gemini' ? await callGemini(prompt) : await callAnthropic(prompt);
     return json(200, { text }, allowed);
   } catch (e) {
-    console.error('[ai]', e.message);
+    console.error('[ai] Échec du fournisseur', e.status || e.name);
     return json(502, { error: "L'assistant IA n'a pas répondu. Réessayez dans un instant." }, allowed);
   }
 };
 
-export const config = { path: '/api/ai' };
+export const config = { path: '/api/ai', rateLimit: { windowLimit: 12, windowSize: 60, aggregateBy: ['ip', 'domain'] } };
